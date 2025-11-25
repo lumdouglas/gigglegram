@@ -1,50 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [resultGif, setResultGif] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const router = useRouter();
-
-  // Check if user is logged in
-  useEffect(() => {
-    console.log('🔍 AUTH CHECK STARTING');
-    
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      console.log('👤 USER RESULT:', user);
-      
-      if (!user) {
-        console.log('❌ NO USER - REDIRECTING TO LOGIN');
-        router.push('/login');
-      } else {
-        console.log('✅ USER FOUND:', user.email);
-        
-        // Create user in database if first login
-        console.log('📝 Creating/checking user in database...');
-        const createUserResponse = await fetch('/api/create-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, email: user.email }),
-        });
-        const createUserData = await createUserResponse.json();
-        console.log('📝 Create user result:', createUserData);
-        
-        setUser(user);
-      }
-      setAuthChecked(true);
-    };
-    
-    checkUser();
-  }, [router]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -101,42 +64,12 @@ export default function Home() {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
-
-  // Show loading while checking auth
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-2xl">🔄 Checking login...</p>
-      </div>
-    );
-  }
-
-  // If no user after check, don't render (will redirect)
-  if (!user) {
-    return null;
-  }
-
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-red-50 to-green-50">
       <div className="max-w-md mx-auto">
         <h1 className="text-5xl font-bold text-center mb-2">
           🎄 GiggleGram
         </h1>
-
-        {/* User Info & Logout */}
-        <div className="text-center mb-4">
-          <p className="text-sm text-gray-600">Logged in as: {user.email}</p>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-500 hover:underline"
-          >
-            Log out
-          </button>
-        </div>
 
         <p className="text-center text-gray-600 mb-8 text-lg">
           Swap faces, spread joy! ✨
