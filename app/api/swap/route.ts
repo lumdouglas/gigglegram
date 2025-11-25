@@ -57,4 +57,13 @@ export async function POST(request: NextRequest) {
     console.log('Output:', prediction.output);
 
     return NextResponse.json({ 
-      succes
+      success: true,
+      output: prediction.output 
+    });
+  } catch (error: any) {
+    console.error('❌ API Error:', error);
+    return NextResponse.json({ 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
