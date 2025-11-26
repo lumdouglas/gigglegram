@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       version: "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34",
       input: {
         input_image: sourceImage,
-        target_image: targetVideo,
+        swap_image: targetVideo,
       },
     });
 
