@@ -8,14 +8,15 @@ const replicate = new Replicate({
 export async function POST(request: NextRequest) {
   try {
     // 1. Parse Input
+    // sourceImage = Nana's Photo (Face)
+    // targetVideo = The Template (Body)
     const { sourceImage, targetVideo } = await request.json();
 
     console.log('🎬 Starting Hollywood Face Swap (xrunda/hello)...');
-    console.log('Source:', sourceImage);
-    console.log('Target Video:', targetVideo);
+    console.log('Face (target):', sourceImage);
+    console.log('Video (source):', targetVideo);
 
-    // 2. FETCH VERSION ID (The Fix)
-    // We must look up the specific version hash for 'xrunda/hello' to avoid the 404 error.
+    // 2. FETCH VERSION ID
     const model = await replicate.models.get("xrunda", "hello");
     const versionId = model.latest_version?.id;
 
@@ -25,14 +26,13 @@ export async function POST(request: NextRequest) {
         }, { status: 500 });
     }
 
-    console.log('🔑 Found Version ID:', versionId);
-
-    // 3. Kick off Prediction using the Version ID
+    // 3. Kick off Prediction (CORRECTED SCHEMA)
+    // Model Docs: 'source' is the video, 'target' is the face image.
     const prediction = await replicate.predictions.create({
-      version: versionId, // Using the specific hash we just found
+      version: versionId,
       input: {
-        source_image: sourceImage,
-        target_video: targetVideo,
+        source: targetVideo,  // The Body (Video)
+        target: sourceImage,  // The Face (Image)
       },
     });
 
@@ -63,14 +63,16 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // 5. Data Parsing (Handling array output)
+    // 5. Data Parsing
     console.log('✅ Hollywood Swap Complete!');
     
+    // Check for output
     const finalOutput = Array.isArray(currentPrediction.output) 
       ? currentPrediction.output[0] 
       : currentPrediction.output;
 
     if (!finalOutput) {
+        console.error("Empty Output from Replicate:", currentPrediction);
         return NextResponse.json({ 
             error: "The magic finished, but the video disappeared! Try again."
         }, { status: 500 });
