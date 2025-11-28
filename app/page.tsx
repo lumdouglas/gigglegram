@@ -4,14 +4,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 
+// 🎅 NANA'S OFFICIAL WAITING ROOM SCRIPT (5s Rotation)
 const LOADING_MESSAGES = [
-  "Santa is mixing ingredients... 🍪",       
-  "Elves are polishing the camera lens... 📸",
-  "Adding Christmas sparkles... ✨",         
-  "Checking the Naughty List... 📜",         
-  "Almost ready! Wrapping it up... 🎁",      
-  "Just a few more seconds... ❄️",
-  "The elves are working overtime! 🎅"
+  "Santa is baking your cookies... 🍪",             // 0s-5s
+  "The Elves are polishing the camera lens... 🧝",  // 5s-10s
+  "Finding your grandbaby's best smile... 👶",      // 10s-15s
+  "Adding a sprinkle of North Pole magic... ✨",    // 15s-20s
+  "Rudolph is warming up the sleigh... 🦌",         // 20s-25s
+  "Almost there! Don't close your phone... ❤️",     // 25s-30s
+  "Wrapping it up with a big red bow... 🎀",        // 30s-35s
+  "Here it comes!! 🎄"                              // 35s+
 ];
 
 export default function Home() {
@@ -31,7 +33,6 @@ export default function Home() {
   // 1. IDENTITY & CREDIT CHECK (On Load)
   useEffect(() => {
     const initUser = async () => {
-      // Get or Create Device ID
       let id = localStorage.getItem('giggle_device_id');
       if (!id) {
         id = uuidv4();
@@ -39,7 +40,6 @@ export default function Home() {
       }
       setDeviceId(id);
 
-      // Check Supabase for credits
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -50,22 +50,29 @@ export default function Home() {
         setCredits(data.credits_remaining);
         setFreeUsed(data.free_swap_used);
       } else {
-        // Create new user row if first time
         await supabase.from('users').insert([{ device_id: id }]);
       }
     };
     initUser();
   }, []);
 
-  // SANTA TEXT ROTATION
+  // 2. THE SANTA WAITING ROOM (5s Interval)
   useEffect(() => {
     if (!isLoading) return;
+    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
+
     const interval = setInterval(() => {
-      msgIndex = (msgIndex + 1) % LOADING_MESSAGES.length;
-      setLoadingMessage(LOADING_MESSAGES[msgIndex]);
-    }, 6000); 
+      msgIndex = (msgIndex + 1);
+      // Loop back to start if it takes longer than 40s (8 messages * 5s)
+      if (msgIndex < LOADING_MESSAGES.length) {
+          setLoadingMessage(LOADING_MESSAGES[msgIndex]);
+      } else {
+          setLoadingMessage(LOADING_MESSAGES[0]); // Loop back to "Santa is baking..."
+      }
+    }, 5000); // 5 Seconds per message
+
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -82,8 +89,7 @@ export default function Home() {
         return;
     }
 
-    // 🛑 PAYWALL GUARD 🛑
-    // If they used the free swap AND have 0 credits, stop them.
+    // 🛑 PAYWALL GUARD
     if (freeUsed && credits <= 0) {
         setShowPaywall(true); 
         return; 
@@ -122,11 +128,10 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // SUCCESS! Deduct Credit / Mark Free Used
+            // Deduct Credit / Mark Free Used
             setFreeUsed(true);
             if (credits > 0) setCredits(prev => prev - 1);
 
-            // Update DB in background
             await supabase.from('users')
                 .update({ free_swap_used: true, credits_remaining: credits > 0 ? credits - 1 : 0 })
                 .eq('device_id', deviceId);
@@ -182,7 +187,7 @@ export default function Home() {
         <h1 className="text-5xl font-bold text-center mb-2 text-teal-700">My Grandbaby Runs The World! ❤️</h1>
         <p className="text-center text-gray-600 mb-8 text-lg">The favorite grandbaby magic, just for you ✨</p>
 
-        {/* CREDIT COUNTER (Visible only if they have paid credits) */}
+        {/* CREDIT COUNTER */}
         {credits > 0 && (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-4 border-2 border-yellow-300">
                 ✨ {credits} Magic Credits Remaining
@@ -236,7 +241,6 @@ export default function Home() {
               <br/>(That's less than a cup of cocoa! ☕️)
             </p>
             
-            {/* LEMON SQUEEZY BUTTON - WITH DEVICE TRACKING */}
             <a 
               href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
               className="block w-full bg-[#FF4F82] hover:bg-[#E03E6E] text-white py-4 rounded-xl text-xl font-bold mb-3"

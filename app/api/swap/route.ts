@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const { sourceImage, targetVideo } = await request.json();
 
-    console.log('🎬 Starting Hollywood Face Swap (Realism Mode)...');
+    console.log('🎬 Starting Hollywood Face Swap (xrunda/hello)...');
     
     // FETCH VERSION ID
     // @ts-ignore
@@ -25,23 +25,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
 
-    // START PREDICTION (REALISM CONFIG)
+    // START PREDICTION (CLEAN INPUTS)
+    // We removed 'enhance_face' etc. because xrunda/hello ignores them.
+    // We trust the model's default behavior.
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
-        // MAPPING: 'source' = Template Video, 'target' = Face Image
-        source: targetVideo,   
-        target: sourceImage,   
-        
-        // 🛑 TURN OFF THE BEAUTY FILTER
-        // We disable all known enhancement flags to save the braces/glasses/freckles.
-        enhance_face: false,   
-        use_gfpgan: false,
-        face_restore: false,
-        
-        // 🛑 KEEP FRAME RATE
-        keep_fps: true, 
-        keep_frames: true 
+        source: targetVideo,   // The Template Video (Body)
+        target: sourceImage,   // The Uploaded Photo (Face)
       },
     });
 
