@@ -20,16 +20,16 @@ export default function Home() {
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. THE SANTA WAITING ROOM IMPLEMENTATION (TypeScript Fixed)
+  // 1. THE SANTA WAITING ROOM (TypeScript Safe Version)
   useEffect(() => {
-    // FIX: Early return. If not loading, we don't need a timer at all.
-    // This prevents 'interval' from ever being undefined during cleanup.
+    // FIX: Early return. If we are NOT loading, stop here.
+    // This prevents us from ever trying to clear an undefined timer.
     if (!isLoading) return;
 
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
 
-    // Start the timer
+    // Create the timer locally (const) so it is never undefined
     const interval = setInterval(() => {
       msgIndex = (msgIndex + 1);
       if (msgIndex < LOADING_MESSAGES.length) {
@@ -39,7 +39,7 @@ export default function Home() {
       }
     }, 6000); 
 
-    // Cleanup function: Only runs when the effect is cleaned up (component unmounts or loading stops)
+    // Cleanup: This only runs when the component unmounts or isLoading changes
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -75,6 +75,7 @@ export default function Home() {
         .getPublicUrl(filename);
       
       // CRITICAL: Template must be hardcoded here until Template Selection UI is built.
+      // Use the Baby CEO template as the default
       const targetVideoUrl = "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4";
 
       // 2. Call the Hollywood API (xrunda/hello)
