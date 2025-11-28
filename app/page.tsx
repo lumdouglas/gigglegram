@@ -1,13 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+
+// CRITICAL UX: The "Santa Waiting Room" text rotation
+const LOADING_MESSAGES = [
+  "Santa is mixing ingredients... 🍪",       // 0s
+  "Elves are polishing the camera lens... 📸",// 6s
+  "Adding Christmas sparkles... ✨",         // 12s
+  "Checking the Naughty List... 📜",         // 18s
+  "Almost ready! Wrapping it up... 🎁",      // 24s
+  "Just a few more seconds... ❄️"              // 30s+
+];
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [resultGif, setResultGif] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
+  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // 1. THE SANTA WAITING ROOM IMPLEMENTATION (UseEffect)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isLoading) {
+      let msgIndex = 0;
+      setLoadingMessage(LOADING_MESSAGES[0]); 
+      
+      interval = setInterval(() => {
+        msgIndex = (msgIndex + 1);
+        if (msgIndex < LOADING_MESSAGES.length) {
+            setLoadingMessage(LOADING_MESSAGES[msgIndex]);
+        } else {
+            setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
+        }
+      }, 6000); 
+      
+    } else {
+        clearInterval(interval);
+    }
+    
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -16,70 +52,83 @@ export default function Home() {
     }
   };
 
+  // 2. THE RESILIENT HANDLE SWAP FUNCTION
   const handleSwap = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) {
+        setError("Please pick a photo first, grandbaby! 👶");
+        return;
+    }
 
     setIsLoading(true);
     setError(null);
 
+    // CRITICAL: We need a clean reference to the timer to clear it if the API crashes.
+    // The useEffect hook manages the timer start, but we need to ensure the catch block correctly stops the loading state.
+
     try {
       // 1. Upload to Supabase Storage
       const filename = `${Date.now()}-${selectedFile.name}`;
-      console.log('📤 Uploading:', filename);
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-uploads')
         .upload(filename, selectedFile);
 
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        throw new Error('Upload failed: ' + uploadError.message);
-      }
+      if (uploadError) throw new Error('Upload failed: ' + uploadError.message);
 
-      console.log('✅ Upload success:', uploadData);
-
-      // 2. Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('user-uploads')
         .getPublicUrl(filename);
+      
+      // CRITICAL: Template must be hardcoded here until Template Selection UI is built.
+      const targetVideoUrl = "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4";
 
-      // 3. Call swap API with URL
+      // 2. Call the Hollywood API (xrunda/hello)
       const response = await fetch('/api/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceImage: publicUrl }),
+        body: JSON.stringify({ 
+          sourceImage: publicUrl,
+          targetVideo: targetVideoUrl 
+        }),
       });
 
       const data = await response.json();
+      
       setIsLoading(false);
 
       if (data.success) {
-        setResultGif(data.output);
+        setResultVideoUrl(data.output);
       } else {
-        setError(data.error || 'Something went wrong');
+        // If the API call returns successfully but with an error status (e.g., from Replicate), show the error.
+        setError(data.error || 'The magic fizzled out! Try again. ✨');
       }
     } catch (err: any) {
+      // This catch block handles network/unhandled errors and correctly resets the state.
+      // This is where the instant reset is happening.
+      console.error("Unhandeled Swap Error:", err);
       setIsLoading(false);
-      setError(err.message || 'Network error. Try again!');
+      setError('Connection error: The North Pole server may be down. 🎅');
     }
   };
 
+  const buttonStyle = "w-full bg-pink-500 hover:bg-pink-600 text-white py-4 rounded-xl text-2xl font-bold transition-colors min-h-[70px] disabled:bg-gray-300 disabled:cursor-not-allowed";
+
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-red-50 to-green-50">
+    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50"> 
       <div className="max-w-md mx-auto">
-        <h1 className="text-5xl font-bold text-center mb-2">
-          🎄 GiggleGram
+        <h1 className="text-5xl font-bold text-center mb-2 text-teal-700">
+          My Grandbaby Runs The World! ❤️
         </h1>
 
         <p className="text-center text-gray-600 mb-8 text-lg">
-          Swap faces, spread joy! ✨
+          The favorite grandbaby magic, just for you ✨
         </p>
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           {/* File Upload */}
           <label className="block mb-4">
-            <span className="text-lg font-semibold mb-2 block">
-              📸 Pick a Photo
+            <span className="text-2xl font-bold mb-2 block text-gold-700">
+              📸 Pick a Photo 👶
             </span>
             <input
               type="file"
@@ -100,13 +149,20 @@ export default function Home() {
             </div>
           )}
 
-          {/* Swap Button */}
+          {/* Action Button: Rotating "Santa" Logic */}
           <button
             onClick={handleSwap}
             disabled={!selectedFile || isLoading}
-            className="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl text-2xl font-bold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className={buttonStyle}
           >
-            {isLoading ? '🎭 Swapping Faces...' : '✨ Swap My Face!'}
+             {isLoading ? (
+                // Displays the rotating message
+                <span className="flex items-center justify-center gap-2 animate-pulse">
+                  {loadingMessage}
+                </span>
+              ) : (
+                '✨ Make the Magic'
+              )}
           </button>
 
           {/* Error Message */}
@@ -116,42 +172,35 @@ export default function Home() {
             </div>
           )}
 
-          {/* Result GIF */}
-          {resultGif && (
+          {/* Result Section (Viral Loop) */}
+          {resultVideoUrl && (
             <div className="mt-6">
-              <h2 className="text-2xl font-bold mb-3">🎉 Your GiggleGram!</h2>
+              <h2 className="text-2xl font-bold mb-3">🎉 Look what your grandbaby made!</h2>
               
-              {/* Video with CSS watermark overlay */}
+              {/* FINAL ASSET: CACHE BUSTER + MOBILE COMPATIBILITY FIX */}
               <div className="relative rounded-lg shadow-lg overflow-hidden">
-                <img 
-                  src={resultGif} 
-                  alt="Result"
+                <video 
+                  // Cache Buster: Appends current timestamp to the URL to force the mobile browser to reload the video every time, preventing blank screens.
+                  src={`${resultVideoUrl}?t=${Date.now()}`}
+                  controls 
+                  autoPlay 
+                  loop 
+                  playsInline // Critical for iOS compatibility and autoplay
+                  muted // Often required for autoplay on mobile
                   className="w-full"
-                />
-                
-                {/* Watermark overlay */}
-                <div className="absolute bottom-4 right-4 text-white text-xl font-bold opacity-60 animate-bounce">
-                  GiggleGram.com ✨
-                </div>
+                >
+                    Your browser does not support the video tag.
+                </video>
               </div>
               
-              {/* Download Button */}
+              {/* Tap 3: Send to Family Group (The single success metric) */}
               <a 
-                href={resultGif}
-                download="gigglegram.gif"
-                className="block mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-xl font-bold text-center"
-              >
-                💾 Download
-              </a>
-
-              {/* WhatsApp Share Button */}
-              <a 
-                href={`https://wa.me/?text=${encodeURIComponent(`Look what I made! 😂 Tap GiggleGram.com to make yours!\n\n${resultGif}`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent("Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block mt-3 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-3 rounded-lg text-xl font-bold text-center"
+                className="block mt-4 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-2xl font-bold text-center min-h-[70px]"
               >
-                📱 Send to Family Group
+                Send to Family Group 🎄❤️
               </a>
             </div>
           )}

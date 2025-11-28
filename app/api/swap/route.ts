@@ -5,61 +5,74 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN!,
 });
 
-// Template videos
-const TEMPLATES = {
-  baby_ceo: "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4",
-  disco_baby: "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/disco_baby.mp4",
-  snowball_sniper: "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/snowball_sniper.mp4",
-};
-
 export async function POST(request: NextRequest) {
   try {
-    const { sourceImage, template = 'baby_ceo' } = await request.json();
+    // 1. Parse Input
+    // 'sourceImage' comes from the frontend (the user's uploaded photo)
+    // 'targetVideo' comes from the frontend (the selected template URL)
+    const { sourceImage, targetVideo } = await request.json();
 
-    const targetVideo = TEMPLATES[template as keyof typeof TEMPLATES] || TEMPLATES.baby_ceo;
-
-    console.log('🎬 Starting VIDEO face swap...');
+    console.log('🎬 Starting Hollywood Face Swap (xrunda/hello)...');
     console.log('Source:', sourceImage);
     console.log('Target Video:', targetVideo);
 
-    let prediction = await replicate.predictions.create({
-      version: "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34",
+    // 2. Kick off Prediction (xrunda/hello)
+    const prediction = await replicate.predictions.create({
+      model: "xrunda/hello", 
       input: {
-        input_image: sourceImage,
-        swap_image: targetVideo,
+        source_image: sourceImage,
+        target_video: targetVideo,
       },
     });
 
     console.log('⏳ Prediction started:', prediction.id);
 
-    // Poll until complete (max 60 seconds for video processing)
+    // 3. Poll for Completion (Handling the ~40s wait)
     const startTime = Date.now();
-    while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-      if (Date.now() - startTime > 60000) {
+    let currentPrediction = prediction;
+
+    while (currentPrediction.status !== 'succeeded' && currentPrediction.status !== 'failed') {
+      // Timeout Safety: 55 seconds (to avoid Vercel timeout)
+      if (Date.now() - startTime > 55000) {
         return NextResponse.json({ 
-          error: '⏰ Taking longer than expected. Try again!' 
+          error: 'The elves are slow today! Please try again. 🍪' 
         }, { status: 408 });
       }
       
+      // Wait 2 seconds between checks
       await new Promise(resolve => setTimeout(resolve, 2000));
-      prediction = await replicate.predictions.get(prediction.id);
-      console.log('Status:', prediction.status);
+      currentPrediction = await replicate.predictions.get(prediction.id);
+      console.log('Status:', currentPrediction.status);
     }
 
-    if (prediction.status === 'failed') {
-      console.error('❌ Prediction failed:', prediction.error);
+    if (currentPrediction.status === 'failed') {
+      console.error('❌ Prediction failed:', currentPrediction.error);
       return NextResponse.json({ 
-        error: 'Face swap failed: ' + (prediction.error || 'Unknown error')
+        error: 'Face swap failed: ' + (currentPrediction.error || 'Unknown error')
       }, { status: 500 });
     }
 
-    console.log('✅ Video face swap complete!');
-    console.log('Output:', prediction.output);
+    // 4. CRITICAL FIX: Data Parsing (Handling array output)
+    console.log('✅ Hollywood Swap Complete!');
+    
+    // Many Replicate models return an array of URLs. We must ensure we grab the first (and usually only) URL.
+    const finalOutput = Array.isArray(currentPrediction.output) 
+      ? currentPrediction.output[0] 
+      : currentPrediction.output;
+
+    if (!finalOutput) {
+        return NextResponse.json({ 
+            error: "The magic finished, but the video disappeared! Try again."
+        }, { status: 500 });
+    }
+
+    console.log('Output URL:', finalOutput);
 
     return NextResponse.json({ 
-      success: true,
-      output: prediction.output 
+      success: true, 
+      output: finalOutput 
     });
+
   } catch (error: any) {
     console.error('❌ API Error:', error);
     return NextResponse.json({ 
