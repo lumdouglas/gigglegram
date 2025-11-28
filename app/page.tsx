@@ -96,26 +96,7 @@ export default function Home() {
     }
   };
 
-  // DYNAMIC BUTTON STYLING
-  // If Loading: Stay PINK, pulse heavily, remove "disabled" gray look.
-  // If No File: Gray out (Disabled).
-  // If Ready: Standard Pink.
-  const getButtonStyle = () => {
-    const base = "w-full py-4 rounded-xl text-2xl font-bold transition-all min-h-[70px] ";
-    
-    if (isLoading) {
-        // MAGIC MODE: High contrast pink + pulsing
-        return base + "bg-pink-600 text-white cursor-wait animate-pulse shadow-inner";
-    }
-    
-    if (!selectedFile) {
-        // DISABLED MODE: Gray
-        return base + "bg-gray-300 text-gray-500 cursor-not-allowed";
-    }
-    
-    // READY MODE: Standard Pink
-    return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
-  };
+  const buttonStyle = "w-full bg-pink-500 hover:bg-pink-600 text-white py-4 rounded-xl text-2xl font-bold transition-colors min-h-[70px] disabled:bg-gray-300 disabled:cursor-not-allowed";
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50"> 
@@ -135,19 +116,8 @@ export default function Home() {
             </div>
           )}
 
-          <button 
-            onClick={handleSwap} 
-            disabled={!selectedFile || isLoading} 
-            className={getButtonStyle()}
-          >
-             {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  {/* We keep the text white and bold on the pink background */}
-                  ⏳ {loadingMessage}
-                </span>
-             ) : (
-                '✨ Make the Magic'
-             )}
+          <button onClick={handleSwap} disabled={!selectedFile || isLoading} className={buttonStyle}>
+             {isLoading ? <span className="flex items-center justify-center gap-2 animate-pulse">{loadingMessage}</span> : '✨ Make the Magic'}
           </button>
 
           {error && (
