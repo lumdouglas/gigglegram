@@ -5,90 +5,77 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN!,
 });
 
+// 1. POST: STARTS the magic (Returns ID immediately)
 export async function POST(request: NextRequest) {
   try {
-    // 1. Parse Input
-    // sourceImage = Nana's Photo (Face)
-    // targetVideo = The Template (Body)
     const { sourceImage, targetVideo } = await request.json();
 
-    console.log('🎬 Starting Hollywood Face Swap (xrunda/hello)...');
-    console.log('Face (target):', sourceImage);
-    console.log('Video (source):', targetVideo);
-
-    // 2. FETCH VERSION ID
+    console.log('🎬 Starting Hollywood Face Swap (Async)...');
+    
+    // FETCH VERSION ID
     const model = await replicate.models.get("xrunda", "hello");
     const versionId = model.latest_version?.id;
 
     if (!versionId) {
-        return NextResponse.json({ 
-            error: "Could not find the model version! Is the AI sleeping?" 
-        }, { status: 500 });
+        return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
 
-    // 3. Kick off Prediction (CORRECTED SCHEMA)
-    // Model Docs: 'source' is the video, 'target' is the face image.
+    // START PREDICTION
+    // We use standard keys 'source_image' and 'driving_video' which are safest for this model type
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
-        source: targetVideo,  // The Body (Video)
-        target: sourceImage,  // The Face (Image)
+        source_image: sourceImage,  // The Face
+        driving_video: targetVideo, // The Template
       },
     });
 
-    console.log('⏳ Prediction started:', prediction.id);
+    console.log('🚀 Job Started. ID:', prediction.id);
 
-    // 4. Poll for Completion (Handling the ~40s wait)
-    const startTime = Date.now();
-    let currentPrediction = prediction;
-
-    while (currentPrediction.status !== 'succeeded' && currentPrediction.status !== 'failed') {
-      // Timeout Safety: 55 seconds
-      if (Date.now() - startTime > 55000) {
-        return NextResponse.json({ 
-          error: 'The elves are slow today! Please try again. 🍪' 
-        }, { status: 408 });
-      }
-      
-      // Wait 2 seconds between checks
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      currentPrediction = await replicate.predictions.get(prediction.id);
-      console.log('Status:', currentPrediction.status);
-    }
-
-    if (currentPrediction.status === 'failed') {
-      console.error('❌ Prediction failed:', currentPrediction.error);
-      return NextResponse.json({ 
-        error: 'Face swap failed: ' + (currentPrediction.error || 'Unknown error')
-      }, { status: 500 });
-    }
-
-    // 5. Data Parsing
-    console.log('✅ Hollywood Swap Complete!');
-    
-    // Check for output
-    const finalOutput = Array.isArray(currentPrediction.output) 
-      ? currentPrediction.output[0] 
-      : currentPrediction.output;
-
-    if (!finalOutput) {
-        console.error("Empty Output from Replicate:", currentPrediction);
-        return NextResponse.json({ 
-            error: "The magic finished, but the video disappeared! Try again."
-        }, { status: 500 });
-    }
-
-    console.log('Output URL:', finalOutput);
-
+    // Return the ID immediately so Vercel doesn't timeout
     return NextResponse.json({ 
       success: true, 
-      output: finalOutput 
+      id: prediction.id 
     });
 
   } catch (error: any) {
-    console.error('❌ API Error:', error);
-    return NextResponse.json({ 
-      error: error.message 
-    }, { status: 500 });
+    console.error('❌ Start Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// 2. GET: CHECKS the magic (Called repeatedly)
+export async function GET(request: NextRequest) {
+    const id = request.nextUrl.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
+
+    try {
+        const prediction = await replicate.predictions.get(id);
+        
+        // If finished, parse output
+        if (prediction.status === 'succeeded') {
+            const finalOutput = Array.isArray(prediction.output) 
+                ? prediction.output[0] 
+                : prediction.output;
+            
+            return NextResponse.json({ 
+                status: 'succeeded', 
+                output: finalOutput 
+            });
+        }
+        
+        // If failed
+        if (prediction.status === 'failed' || prediction.status === 'canceled') {
+            return NextResponse.json({ 
+                status: 'failed', 
+                error: prediction.error 
+            });
+        }
+
+        // If still processing (starting, processing)
+        return NextResponse.json({ status: prediction.status });
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }
