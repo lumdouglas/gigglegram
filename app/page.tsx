@@ -20,27 +20,26 @@ export default function Home() {
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. THE SANTA WAITING ROOM IMPLEMENTATION (UseEffect)
+  // 1. THE SANTA WAITING ROOM IMPLEMENTATION (TypeScript Fixed)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isLoading) {
-      let msgIndex = 0;
-      setLoadingMessage(LOADING_MESSAGES[0]); 
-      
-      interval = setInterval(() => {
-        msgIndex = (msgIndex + 1);
-        if (msgIndex < LOADING_MESSAGES.length) {
-            setLoadingMessage(LOADING_MESSAGES[msgIndex]);
-        } else {
-            setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
-        }
-      }, 6000); 
-      
-    } else {
-        clearInterval(interval);
-    }
-    
+    // FIX: Early return. If not loading, we don't need a timer at all.
+    // This prevents 'interval' from ever being undefined during cleanup.
+    if (!isLoading) return;
+
+    let msgIndex = 0;
+    setLoadingMessage(LOADING_MESSAGES[0]); 
+
+    // Start the timer
+    const interval = setInterval(() => {
+      msgIndex = (msgIndex + 1);
+      if (msgIndex < LOADING_MESSAGES.length) {
+          setLoadingMessage(LOADING_MESSAGES[msgIndex]);
+      } else {
+          setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
+      }
+    }, 6000); 
+
+    // Cleanup function: Only runs when the effect is cleaned up (component unmounts or loading stops)
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -52,7 +51,6 @@ export default function Home() {
     }
   };
 
-  // 2. THE RESILIENT HANDLE SWAP FUNCTION
   const handleSwap = async () => {
     if (!selectedFile) {
         setError("Please pick a photo first, grandbaby! 👶");
@@ -61,9 +59,6 @@ export default function Home() {
 
     setIsLoading(true);
     setError(null);
-
-    // CRITICAL: We need a clean reference to the timer to clear it if the API crashes.
-    // The useEffect hook manages the timer start, but we need to ensure the catch block correctly stops the loading state.
 
     try {
       // 1. Upload to Supabase Storage
@@ -99,13 +94,10 @@ export default function Home() {
       if (data.success) {
         setResultVideoUrl(data.output);
       } else {
-        // If the API call returns successfully but with an error status (e.g., from Replicate), show the error.
         setError(data.error || 'The magic fizzled out! Try again. ✨');
       }
     } catch (err: any) {
-      // This catch block handles network/unhandled errors and correctly resets the state.
-      // This is where the instant reset is happening.
-      console.error("Unhandeled Swap Error:", err);
+      console.error("Unhandled Swap Error:", err);
       setIsLoading(false);
       setError('Connection error: The North Pole server may be down. 🎅');
     }
@@ -180,20 +172,19 @@ export default function Home() {
               {/* FINAL ASSET: CACHE BUSTER + MOBILE COMPATIBILITY FIX */}
               <div className="relative rounded-lg shadow-lg overflow-hidden">
                 <video 
-                  // Cache Buster: Appends current timestamp to the URL to force the mobile browser to reload the video every time, preventing blank screens.
                   src={`${resultVideoUrl}?t=${Date.now()}`}
                   controls 
                   autoPlay 
                   loop 
-                  playsInline // Critical for iOS compatibility and autoplay
-                  muted // Often required for autoplay on mobile
+                  playsInline 
+                  muted 
                   className="w-full"
                 >
                     Your browser does not support the video tag.
                 </video>
               </div>
               
-              {/* Tap 3: Send to Family Group (The single success metric) */}
+              {/* Tap 3: Send to Family Group */}
               <a 
                 href={`https://wa.me/?text=${encodeURIComponent("Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄")}`}
                 target="_blank"
