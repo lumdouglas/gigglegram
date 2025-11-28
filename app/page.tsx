@@ -19,6 +19,7 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false); // New state for share button feedback
 
   // SANTA TEXT ROTATION
   useEffect(() => {
@@ -73,9 +74,7 @@ export default function Home() {
 
       // 3. Poll Status (GET Loop)
       while (true) {
-        // Wait 3 seconds
         await new Promise(r => setTimeout(r, 3000));
-        
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
         const checkData = await checkRes.json();
 
@@ -86,7 +85,6 @@ export default function Home() {
         } else if (checkData.status === 'failed') {
             throw new Error(checkData.error || 'Magic failed');
         }
-        // If 'processing' or 'starting', the loop continues...
       }
 
     } catch (err: any) {
@@ -96,7 +94,47 @@ export default function Home() {
     }
   };
 
-  const buttonStyle = "w-full bg-pink-500 hover:bg-pink-600 text-white py-4 rounded-xl text-2xl font-bold transition-colors min-h-[70px] disabled:bg-gray-300 disabled:cursor-not-allowed";
+  // 🚀 SMART SHARE LOGIC
+  const handleSmartShare = async () => {
+    if (!resultVideoUrl) return;
+    setIsSharing(true);
+
+    const shareData = {
+        title: 'My GiggleGram',
+        text: 'Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄',
+    };
+
+    try {
+        // 1. Fetch the video file as a Blob
+        const response = await fetch(resultVideoUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'gigglegram.mp4', { type: 'video/mp4' });
+
+        // 2. Try Native Share with File
+        if (navigator.share && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                ...shareData,
+                files: [file],
+            });
+        } else {
+            // 3. Fallback: Open WhatsApp Text Link (Desktop/Incompatible)
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+        }
+    } catch (err) {
+        console.error('Share failed:', err);
+        // Fallback if sharing is canceled or fails
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+    } finally {
+        setIsSharing(false);
+    }
+  };
+
+  const getButtonStyle = () => {
+    const base = "w-full py-4 rounded-xl text-2xl font-bold transition-all min-h-[70px] ";
+    if (isLoading) return base + "bg-pink-600 text-white cursor-wait animate-pulse shadow-inner";
+    if (!selectedFile) return base + "bg-gray-300 text-gray-500 cursor-not-allowed";
+    return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
+  };
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50"> 
@@ -116,8 +154,8 @@ export default function Home() {
             </div>
           )}
 
-          <button onClick={handleSwap} disabled={!selectedFile || isLoading} className={buttonStyle}>
-             {isLoading ? <span className="flex items-center justify-center gap-2 animate-pulse">{loadingMessage}</span> : '✨ Make the Magic'}
+          <button onClick={handleSwap} disabled={!selectedFile || isLoading} className={getButtonStyle()}>
+             {isLoading ? <span className="flex items-center justify-center gap-2">⏳ {loadingMessage}</span> : '✨ Make the Magic'}
           </button>
 
           {error && (
@@ -132,9 +170,15 @@ export default function Home() {
               <div className="relative rounded-lg shadow-lg overflow-hidden">
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline muted className="w-full" />
               </div>
-              <a href={`https://wa.me/?text=${encodeURIComponent("Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄")}`} target="_blank" rel="noopener noreferrer" className="block mt-4 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-2xl font-bold text-center min-h-[70px]">
-                Send to Family Group 🎄❤️
-              </a>
+              
+              {/* SMART SHARE BUTTON */}
+              <button 
+                onClick={handleSmartShare}
+                disabled={isSharing}
+                className="block mt-4 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-2xl font-bold text-center min-h-[70px] shadow-lg flex items-center justify-center gap-2"
+              >
+                {isSharing ? 'Preparing...' : 'Send to Family Group 🎄❤️'}
+              </button>
             </div>
           )}
         </div>
