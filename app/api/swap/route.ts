@@ -25,18 +25,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
 
-    // START PREDICTION (CORRECTED KEYS)
-    // We use 'source' for the Video and 'target' for the Face.
-    // This schema is what actually triggers the deep processing.
+    // START PREDICTION (RAW MODE)
+    // We set 'enhance_face: false' to prevent the AI from "fixing" the braces.
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
-        source: targetVideo,  // The Template Video (Body)
-        target: sourceImage,  // The Uploaded Photo (Face)
+        source: targetVideo,  // The Template Video
+        target: sourceImage,  // The Uploaded Photo
+        enhance_face: false   // CRITICAL: DISABLE BEAUTY FILTER to save the braces
       },
     });
 
-    console.log('🚀 Job Started. ID:', prediction.id);
+    console.log('🚀 Job Started (Raw Mode). ID:', prediction.id);
 
     return NextResponse.json({ 
       success: true, 
