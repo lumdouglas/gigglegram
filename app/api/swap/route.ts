@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const { sourceImage, targetVideo } = await request.json();
 
-    console.log('🎬 Starting Hollywood Face Swap (Async)...');
+    console.log('🎬 Starting Hollywood Face Swap (Realism Mode)...');
     
     // FETCH VERSION ID
     // @ts-ignore
@@ -25,18 +25,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
 
-    // START PREDICTION (RAW MODE)
-    // We set 'enhance_face: false' to prevent the AI from "fixing" the braces.
+    // START PREDICTION (REALISM CONFIG)
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
-        source: targetVideo,  // The Template Video
-        target: sourceImage,  // The Uploaded Photo
-        enhance_face: false   // CRITICAL: DISABLE BEAUTY FILTER to save the braces
+        // MAPPING: 'source' = Template Video, 'target' = Face Image
+        source: targetVideo,   
+        target: sourceImage,   
+        
+        // 🛑 TURN OFF THE BEAUTY FILTER
+        // We disable all known enhancement flags to save the braces/glasses/freckles.
+        enhance_face: false,   
+        use_gfpgan: false,
+        face_restore: false,
+        
+        // 🛑 KEEP FRAME RATE
+        keep_fps: true, 
+        keep_frames: true 
       },
     });
 
-    console.log('🚀 Job Started (Raw Mode). ID:', prediction.id);
+    console.log('🚀 Job Started. ID:', prediction.id);
 
     return NextResponse.json({ 
       success: true, 
@@ -59,7 +68,6 @@ export async function GET(request: NextRequest) {
         
         console.log(`📡 Polling ${id}: ${prediction.status}`);
 
-        // If finished
         if (prediction.status === 'succeeded') {
             // @ts-ignore
             const output = prediction.output;
@@ -73,7 +81,6 @@ export async function GET(request: NextRequest) {
             });
         }
         
-        // If failed
         if (prediction.status === 'failed' || prediction.status === 'canceled') {
             console.error('❌ Prediction Failed:', prediction.error);
             return NextResponse.json({ 
@@ -82,7 +89,6 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // If still processing
         return NextResponse.json({ status: prediction.status });
 
     } catch (error: any) {
