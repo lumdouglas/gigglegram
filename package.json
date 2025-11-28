@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@supabase/supabase-js": "^2.83.0",
     "@types/uuid": "^10.0.0",
     "fluent-ffmpeg": "^2.1.3",
