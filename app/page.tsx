@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 
+// 🎅 NANA'S OFFICIAL WAITING ROOM SCRIPT
 const LOADING_MESSAGES = [
   "Santa is baking your cookies... 🍪",             
   "The Elves are polishing the camera lens... 🧝",  
@@ -28,7 +29,7 @@ export default function Home() {
   const [credits, setCredits] = useState(0);
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null); // New State
+  const [userEmail, setUserEmail] = useState<string | null>(null); // Track logged-in email
 
   // 1. IDENTITY & CREDIT CHECK (The "Smart Merge" Logic)
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function Home() {
         // CASE 1: Logged In via Email
         setUserEmail(session.user.email);
         
-        // Find row by EMAIL
+        // Find user row by EMAIL
         const { data: emailUser } = await supabase
           .from('users')
           .select('*')
@@ -60,11 +61,10 @@ export default function Home() {
         if (emailUser) {
             currentCredits = emailUser.credits_remaining;
             currentFreeUsed = emailUser.free_swap_used;
-            // Link local device_id to this email for future
+            
+            // Critical: If the email user has a different device_id, adopt it
             if (emailUser.device_id !== currentId) {
-                // Optional: We could update the DB to track this new device, 
-                // but for MVP we just use the credits we found.
-                setDeviceId(emailUser.device_id); // Adopt the ID that has the money
+                setDeviceId(emailUser.device_id); 
                 localStorage.setItem('giggle_device_id', emailUser.device_id);
             }
         }
@@ -159,12 +159,12 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // Deduct Credit / Mark Free Used
+            // Deduct Credit / Mark Free Used locally
             setFreeUsed(true);
             const newCredits = credits > 0 ? credits - 1 : 0;
             setCredits(newCredits);
 
-            // Update DB (Use device_id as primary key)
+            // Update DB
             await supabase.from('users')
                 .update({ free_swap_used: true, credits_remaining: newCredits })
                 .eq('device_id', deviceId);

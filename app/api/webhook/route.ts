@@ -32,22 +32,16 @@ export async function POST(request: NextRequest) {
         // Update credits AND link the email to this device_id
         await supabaseAdmin.from('users')
             .update({ 
-                credits_remaining: 10, // Reset to 10 or increment
-                email: userEmail       // Link the email!
+                credits_remaining: 10, // Reset to 10 credits
+                email: userEmail       // Link the email to the account
             })
             .eq('device_id', deviceId);
             
-        // Note: For a robust system, we should increment, but for MVP launch reset is safer against duplicates
-        // Ideally: credits_remaining = credits_remaining + 10
+        // Fallback: If for some reason the update above didn't stick, ensure we add credits via RPC
         const { error } = await supabaseAdmin.rpc('increment_credits', { 
             row_device_id: deviceId, 
             amount: 10 
         });
-        
-        // Also ensure email is set if RPC only did credits
-        await supabaseAdmin.from('users')
-            .update({ email: userEmail })
-            .eq('device_id', deviceId);
       }
     }
 
