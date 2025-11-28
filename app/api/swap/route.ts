@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
 
-// CRITICAL FIX: Prevent Vercel from caching the polling responses.
-// Without this, the frontend keeps getting "processing" even when the job is done.
+// CRITICAL: Force dynamic to prevent Vercel caching
 export const dynamic = 'force-dynamic';
 
 const replicate = new Replicate({
@@ -17,20 +16,23 @@ export async function POST(request: NextRequest) {
     console.log('🎬 Starting Hollywood Face Swap (Async)...');
     
     // FETCH VERSION ID
+    // @ts-ignore
     const model = await replicate.models.get("xrunda", "hello");
+    // @ts-ignore
     const versionId = model.latest_version?.id;
 
     if (!versionId) {
         return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
 
-    // START PREDICTION
-    // xrunda/hello keys: 'source_image' (Face), 'driving_video' (Template)
+    // START PREDICTION (CORRECTED KEYS)
+    // We use 'source' for the Video and 'target' for the Face.
+    // This schema is what actually triggers the deep processing.
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
-        source_image: sourceImage,  
-        driving_video: targetVideo, 
+        source: targetVideo,  // The Template Video (Body)
+        target: sourceImage,  // The Uploaded Photo (Face)
       },
     });
 
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 2. GET: CHECKS the magic (Polling)
+// 2. GET: CHECKS the magic
 export async function GET(request: NextRequest) {
     const id = request.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
@@ -55,13 +57,13 @@ export async function GET(request: NextRequest) {
     try {
         const prediction = await replicate.predictions.get(id);
         
-        console.log(`📡 Polling ${id}: ${prediction.status}`); // Visible in Vercel Logs
+        console.log(`📡 Polling ${id}: ${prediction.status}`);
 
-        // If finished, parse output
+        // If finished
         if (prediction.status === 'succeeded') {
-            const finalOutput = Array.isArray(prediction.output) 
-                ? prediction.output[0] 
-                : prediction.output;
+            // @ts-ignore
+            const output = prediction.output;
+            const finalOutput = Array.isArray(output) ? output[0] : output;
             
             console.log('✅ Success! Output:', finalOutput);
 
