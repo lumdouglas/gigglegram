@@ -4,16 +4,15 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 
-// 🎅 NANA'S OFFICIAL WAITING ROOM SCRIPT (5s Rotation)
 const LOADING_MESSAGES = [
-  "Santa is baking your cookies... 🍪",             // 0s-5s
-  "The Elves are polishing the camera lens... 🧝",  // 5s-10s
-  "Finding your grandbaby's best smile... 👶",      // 10s-15s
-  "Adding a sprinkle of North Pole magic... ✨",    // 15s-20s
-  "Rudolph is warming up the sleigh... 🦌",         // 20s-25s
-  "Almost there! Don't close your phone... ❤️",     // 25s-30s
-  "Wrapping it up with a big red bow... 🎀",        // 30s-35s
-  "Here it comes!! 🎄"                              // 35s+
+  "Santa is baking your cookies... 🍪",             
+  "The Elves are polishing the camera lens... 🧝",  
+  "Finding your grandbaby's best smile... 👶",      
+  "Adding a sprinkle of North Pole magic... ✨",    
+  "Rudolph is warming up the sleigh... 🦌",         
+  "Almost there! Don't close your phone... ❤️",     
+  "Wrapping it up with a big red bow... 🎀",        
+  "Here it comes!! 🎄"                              
 ];
 
 export default function Home() {
@@ -29,50 +28,82 @@ export default function Home() {
   const [credits, setCredits] = useState(0);
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null); // New State
 
-  // 1. IDENTITY & CREDIT CHECK (On Load)
+  // 1. IDENTITY & CREDIT CHECK (The "Smart Merge" Logic)
   useEffect(() => {
     const initUser = async () => {
-      let id = localStorage.getItem('giggle_device_id');
-      if (!id) {
-        id = uuidv4();
-        localStorage.setItem('giggle_device_id', id!);
+      // A. Check for Magic Link Session (Authenticated Email)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let currentCredits = 0;
+      let currentFreeUsed = false;
+      let currentId = localStorage.getItem('giggle_device_id');
+
+      if (!currentId) {
+        currentId = uuidv4();
+        localStorage.setItem('giggle_device_id', currentId!);
       }
-      setDeviceId(id);
+      setDeviceId(currentId);
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('device_id', id)
-        .single();
+      if (session?.user?.email) {
+        // CASE 1: Logged In via Email
+        setUserEmail(session.user.email);
+        
+        // Find row by EMAIL
+        const { data: emailUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
 
-      if (data) {
-        setCredits(data.credits_remaining);
-        setFreeUsed(data.free_swap_used);
+        if (emailUser) {
+            currentCredits = emailUser.credits_remaining;
+            currentFreeUsed = emailUser.free_swap_used;
+            // Link local device_id to this email for future
+            if (emailUser.device_id !== currentId) {
+                // Optional: We could update the DB to track this new device, 
+                // but for MVP we just use the credits we found.
+                setDeviceId(emailUser.device_id); // Adopt the ID that has the money
+                localStorage.setItem('giggle_device_id', emailUser.device_id);
+            }
+        }
       } else {
-        await supabase.from('users').insert([{ device_id: id }]);
+        // CASE 2: Anonymous Device Check
+        const { data: deviceUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('device_id', currentId)
+          .single();
+
+        if (deviceUser) {
+          currentCredits = deviceUser.credits_remaining;
+          currentFreeUsed = deviceUser.free_swap_used;
+        } else {
+          // Create new anon user
+          await supabase.from('users').insert([{ device_id: currentId }]);
+        }
       }
+
+      setCredits(currentCredits);
+      setFreeUsed(currentFreeUsed);
     };
     initUser();
   }, []);
 
-  // 2. THE SANTA WAITING ROOM (5s Interval)
+  // 2. SANTA WAITING ROOM
   useEffect(() => {
     if (!isLoading) return;
-    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
-
     const interval = setInterval(() => {
       msgIndex = (msgIndex + 1);
-      // Loop back to start if it takes longer than 40s (8 messages * 5s)
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       } else {
-          setLoadingMessage(LOADING_MESSAGES[0]); // Loop back to "Santa is baking..."
+          setLoadingMessage(LOADING_MESSAGES[0]);
       }
-    }, 5000); // 5 Seconds per message
-
+    }, 5000); 
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -130,10 +161,12 @@ export default function Home() {
         if (checkData.status === 'succeeded') {
             // Deduct Credit / Mark Free Used
             setFreeUsed(true);
-            if (credits > 0) setCredits(prev => prev - 1);
+            const newCredits = credits > 0 ? credits - 1 : 0;
+            setCredits(newCredits);
 
+            // Update DB (Use device_id as primary key)
             await supabase.from('users')
-                .update({ free_swap_used: true, credits_remaining: credits > 0 ? credits - 1 : 0 })
+                .update({ free_swap_used: true, credits_remaining: newCredits })
                 .eq('device_id', deviceId);
 
             setResultVideoUrl(checkData.output);
@@ -194,6 +227,13 @@ export default function Home() {
             </div>
         )}
 
+        {/* LOGGED IN STATUS */}
+        {userEmail && (
+            <div className="text-center text-sm text-gray-400 mb-2">
+                Logged in as {userEmail}
+            </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <label className="block mb-4">
             <span className="text-2xl font-bold mb-2 block text-gold-700">📸 Pick a Photo 👶</span>
@@ -229,6 +269,15 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* LOGIN LINK */}
+      {!userEmail && (
+        <div className="text-center mt-8 pb-8">
+            <p className="text-gray-400 text-sm">
+            Already have credits? <a href="/login" className="underline hover:text-pink-500">Log in here</a>
+            </p>
+        </div>
+      )}
 
       {/* 💰 PAYWALL MODAL */}
       {showPaywall && (
