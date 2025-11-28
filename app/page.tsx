@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
-import FingerprintJS from '@fingerprintjs/fingerprintjs'; // NEW
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const LOADING_MESSAGES = [
   "Santa is baking your cookies... 🍪",             
@@ -24,9 +24,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   
-  // MONETIZATION & FINGERPRINT STATE
-  const [deviceId, setDeviceId] = useState<string | null>(null); // UUID for Credits
-  const [fingerprint, setFingerprint] = useState<string | null>(null); // FPJS for Abuse Prevention
+  // MONETIZATION STATE
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [credits, setCredits] = useState(0);
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -35,16 +35,16 @@ export default function Home() {
   // 1. IDENTITY & CREDIT CHECK
   useEffect(() => {
     const initUser = async () => {
-      // A. Load FingerprintJS (Abuse Prevention)
+      // Fingerprint
       try {
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         setFingerprint(result.visitorId);
       } catch (e) {
-        console.warn("Fingerprint failed, allowing lenient access.");
+        console.warn("Fingerprint failed");
       }
 
-      // B. Load User/Credits (Identity)
+      // Session/Credits
       const { data: { session } } = await supabase.auth.getSession();
       let currentId = localStorage.getItem('giggle_device_id');
 
@@ -54,7 +54,6 @@ export default function Home() {
       }
       setDeviceId(currentId);
 
-      // Check Credits
       if (session?.user?.email) {
         setUserEmail(session.user.email);
         const { data: emailUser } = await supabase
@@ -112,8 +111,6 @@ export default function Home() {
         return;
     }
 
-    // 🛑 CLIENT-SIDE CHECK (Credits)
-    // We still check credits here for UX, but the real security is now on the server.
     if (freeUsed && credits <= 0) {
         setShowPaywall(true); 
         return; 
@@ -123,7 +120,6 @@ export default function Home() {
     setError(null);
 
     try {
-      // 1. Upload
       const filename = `${Date.now()}-${selectedFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-uploads').upload(filename, selectedFile);
@@ -134,31 +130,28 @@ export default function Home() {
       
       const targetVideoUrl = "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4";
 
-      // 2. Start Job (WITH SECURITY HEADERS)
       const startRes = await fetch('/api/swap', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'x-device-id': fingerprint || 'unknown', // Send fingerprint
-            'x-user-credits': credits.toString()     // Send current credit claim
+            'x-device-id': fingerprint || 'unknown',
+            'x-user-credits': credits.toString()
         },
         body: JSON.stringify({ sourceImage: publicUrl, targetVideo: targetVideoUrl }),
       });
       
       const startData = await startRes.json();
       
-      // HANDLE SOFT LOCK REJECTION
       if (startRes.status === 402) {
           setIsLoading(false);
-          setFreeUsed(true); // Force update local state
-          setShowPaywall(true); // Show paywall immediately
+          setFreeUsed(true); 
+          setShowPaywall(true); 
           return;
       }
       
       if (!startData.success) throw new Error(startData.error || 'Failed to start magic');
       const predictionId = startData.id;
 
-      // 3. Poll Status
       while (true) {
         await new Promise(r => setTimeout(r, 3000));
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
@@ -188,8 +181,29 @@ export default function Home() {
     }
   };
 
-  // ... (handleSmartShare and getButtonStyle remain the same) ...
-  const handleSmartShare = async () => { /* ... existing code ... */ };
+  const handleSmartShare = async () => {
+    if (!resultVideoUrl) return;
+    setIsSharing(true);
+    const shareData = {
+        title: 'My GiggleGram',
+        text: 'Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄',
+    };
+    try {
+        const response = await fetch(resultVideoUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'gigglegram.mp4', { type: 'video/mp4' });
+        if (navigator.share && navigator.canShare({ files: [file] })) {
+            await navigator.share({ ...shareData, files: [file] });
+        } else {
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+        }
+    } catch (err) {
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+    } finally {
+        setIsSharing(false);
+    }
+  };
+
   const getButtonStyle = () => {
     const base = "w-full py-4 rounded-xl text-2xl font-bold transition-all min-h-[70px] ";
     if (isLoading) return base + "bg-pink-600 text-white cursor-wait animate-pulse shadow-inner";
@@ -199,19 +213,29 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50 relative"> 
-      {/* ... (Existing JSX Layout) ... */}
-      <div className="max-w-md mx-auto">
+      
+      {/* 👤 TOP RIGHT LOGIN / ACCOUNT (De-prioritized) */}
+      <div className="absolute top-4 right-4 z-10">
+        {userEmail ? (
+            <span className="text-xs font-medium text-teal-800 bg-white/50 px-3 py-1 rounded-full border border-teal-100">
+                👤 {userEmail.split('@')[0]}
+            </span>
+        ) : (
+            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">
+                Log In
+            </a>
+        )}
+      </div>
+
+      <div className="max-w-md mx-auto pt-8">
         <h1 className="text-5xl font-bold text-center mb-2 text-teal-700">My Grandbaby Runs The World! ❤️</h1>
         <p className="text-center text-gray-600 mb-8 text-lg">The favorite grandbaby magic, just for you ✨</p>
 
+        {/* CREDIT COUNTER */}
         {credits > 0 && (
-            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-4 border-2 border-yellow-300">
+            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-4 border-2 border-yellow-300 animate-pulse">
                 ✨ {credits} Magic Credits Remaining
             </div>
-        )}
-
-        {userEmail && (
-            <div className="text-center text-sm text-gray-400 mb-2">Logged in as {userEmail}</div>
         )}
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
@@ -250,12 +274,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!userEmail && (
-        <div className="text-center mt-8 pb-8">
-            <p className="text-gray-400 text-sm">Already have credits? <a href="/login" className="underline hover:text-pink-500">Log in here</a></p>
-        </div>
-      )}
-
+      {/* 💰 PAYWALL MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
