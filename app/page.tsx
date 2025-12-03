@@ -51,15 +51,16 @@ const TEMPLATES = [
   }
 ];
 
+// 🎅 THE GIGGLE LOOP (Jokes + Status)
 const LOADING_MESSAGES = [
-  "Santa is baking your cookies... 🍪",             
-  "The Elves are polishing the camera lens... 🧝",  
-  "Finding your grandbaby's best smile... 👶",      
-  "Adding a sprinkle of North Pole magic... ✨",    
-  "Rudolph is warming up the sleigh... 🦌",         
-  "Almost there! Don't close your phone... ❤️",     
-  "Wrapping it up with a big red bow... 🎀",        
-  "Here it comes!! 🎄"                              
+  "🍪 Santa is baking your cookies... (Heating up the GPU)",
+  "🎅 Joke: What do elves learn in school? The Elf-abet!",
+  "🧝 The Elves are polishing the camera lens...",
+  "🦌 Joke: What do you call a blind reindeer? No-eye-deer!",
+  "✨ Adding the magic sparkles...",
+  "❄️ Joke: What falls but never gets hurt? Snow!",
+  "🎁 Almost ready! Don't close your phone...",
+  "🎄 Here it comes!! (Just a few more seconds)"
 ];
 
 export default function Home() {
@@ -80,32 +81,8 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
 
-  // 🔒 PASSWORD PROTECTION STATE
-  const [isLocked, setIsLocked] = useState(true);
-  const [passwordInput, setPasswordInput] = useState('');
-
-  // 0. CHECK PASSWORD (On Load)
-  useEffect(() => {
-    const isUnlocked = localStorage.getItem('site_unlocked');
-    if (isUnlocked === 'true') {
-        setIsLocked(false);
-    }
-  }, []);
-
-  const handleUnlock = () => {
-      if (passwordInput.toLowerCase() === 'doug') {
-          setIsLocked(false);
-          localStorage.setItem('site_unlocked', 'true');
-      } else {
-          alert('Wrong password! Ask Doug.');
-      }
-  };
-
   // 1. IDENTITY & CREDIT CHECK
   useEffect(() => {
-    // Only run if unlocked
-    if (isLocked) return;
-
     const initUser = async () => {
       try {
         const fp = await FingerprintJS.load();
@@ -150,21 +127,24 @@ export default function Home() {
       }
     };
     initUser();
-  }, [isLocked]); // Run when unlocked
+  }, []);
 
-  // 2. SANTA WAITING ROOM
+  // 2. THE GIGGLE LOOP
   useEffect(() => {
     if (!isLoading) return;
+    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
+
     const interval = setInterval(() => {
-      msgIndex = (msgIndex + 1);
+      msgIndex++;
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       } else {
-          setLoadingMessage(LOADING_MESSAGES[0]);
+          setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
       }
-    }, 5000); 
+    }, 6000); 
+
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -247,7 +227,15 @@ export default function Home() {
     } catch (err: any) {
       console.error("Swap Error:", err);
       setIsLoading(false);
-      setError('Connection error: The North Pole server may be down. 🎅 ' + (err.message || ''));
+      
+      // 🛡️ NANA-FRIENDLY ERROR HANDLING
+      const errorMsg = (err.message || '').toLowerCase();
+      
+      if (errorMsg.includes('face') || errorMsg.includes('detect') || errorMsg.includes('found')) {
+          setError("Uh oh! We couldn't find a face. Try a closer photo! 🧐");
+      } else {
+          setError('The magic fizzled out! Try again or pick a different photo. ✨');
+      }
     }
   };
 
@@ -281,39 +269,10 @@ export default function Home() {
     return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
   };
 
-  // 🔒 LOCK SCREEN RENDER
-  if (isLocked) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
-                <h1 className="text-4xl mb-4">🚧</h1>
-                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
-                <p className="text-gray-500 mb-6">Testing in progress. Enter password.</p>
-                
-                <input
-                    type="password"
-                    placeholder="Password"
-                    className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                />
-                
-                <button
-                    onClick={handleUnlock}
-                    className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors"
-                >
-                    Unlock
-                </button>
-            </div>
-        </div>
-      );
-  }
-
-  // 🟢 MAIN APP RENDER
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50 relative"> 
       
-      {/* 👤 TOP RIGHT LOGIN / ACCOUNT */}
+      {/* 👤 TOP RIGHT LOGIN */}
       <div className="absolute top-4 right-4 z-10">
         {userEmail ? (
             <span className="text-xs font-medium text-teal-800 bg-white/50 px-3 py-1 rounded-full border border-teal-100">
@@ -373,7 +332,7 @@ export default function Home() {
             <input type="file" accept="image/*" onChange={handleFileSelect} className="w-full text-lg p-3 border-2 border-gray-300 rounded-lg" />
           </label>
 
-          {/* 🛡️ TRUST BANNER (The Moat) */}
+          {/* 🛡️ TRUST BANNER */}
           <div className="flex items-center justify-start gap-1 mb-4 text-xs text-gray-400 pl-1">
             <span>🔒</span>
             <span>Your photo is deleted immediately after magic.</span>
