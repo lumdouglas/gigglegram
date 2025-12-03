@@ -5,53 +5,67 @@ import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-// 🎬 THE CONTENT LIBRARY
+// 🎬 THE CONTENT LIBRARY (Updated Filenames)
 const TEMPLATES = [
   { 
     id: 'baby_ceo', 
     name: 'Baby CEO', 
-    emoji: '💼', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg',
     badge: '🔥 POPULAR' 
   },
   { 
     id: 'cookie_thief', 
     name: 'Cookie Thief', 
-    emoji: '🍪', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/cookie_thief.mp4', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.jpg',
     badge: '🆕 NEW' 
   },
   { 
-    id: 'snowball', 
+    id: 'snowball_sniper', 
     name: 'Snowball Sniper', 
-    emoji: '❄️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/snowball_sniper.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg',
     badge: '🎄 FESTIVE' 
   },
   { 
-    id: 'disco', 
+    id: 'disco_baby', 
     name: 'Disco Baby', 
-    emoji: '🕺', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/disco_baby.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg',
     badge: '' 
   },
   { 
     id: 'royal_wave', 
     name: 'Royal Wave', 
-    emoji: '👑', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/royal_wave.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
     badge: '' 
   },
   { 
-    id: 'bodybuilder', 
+    id: 'tiny_bodybuilder', 
     name: 'Tiny Muscle', 
-    emoji: '💪', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/tiny_bodybuilder.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg',
     badge: '' 
+  },
+  { 
+    id: 'conductor', 
+    name: 'The Conductor', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg',
+    badge: '' 
+  },
+  { 
+    id: 'north_pole', 
+    name: 'North Pole Express', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.jpg',
+    badge: '🚂 CHOO CHOO' 
   }
 ];
 
-// 🎅 THE GIGGLE LOOP
+// 🎅 THE GIGGLE LOOP (Jokes + Status)
 const LOADING_MESSAGES = [
   "🍪 Santa is baking your cookies... (Heating up the GPU)",
   "🎅 Joke: What do elves learn in school? The Elf-abet!",
@@ -80,13 +94,17 @@ export default function Home() {
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
+  
+  // PASSWORD STATE
   const [isLocked, setIsLocked] = useState(true);
   const [passwordInput, setPasswordInput] = useState('');
 
-  // 0. CHECK PASSWORD
+  // 0. CHECK PASSWORD (On Load)
   useEffect(() => {
     const isUnlocked = localStorage.getItem('site_unlocked');
-    if (isUnlocked === 'true') setIsLocked(false);
+    if (isUnlocked === 'true') {
+        setIsLocked(false);
+    }
   }, []);
 
   const handleUnlock = () => {
@@ -151,8 +169,10 @@ export default function Home() {
   // 2. THE GIGGLE LOOP
   useEffect(() => {
     if (!isLoading) return;
+    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
+
     const interval = setInterval(() => {
       msgIndex++;
       if (msgIndex < LOADING_MESSAGES.length) {
@@ -161,6 +181,7 @@ export default function Home() {
           setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
       }
     }, 6000); 
+
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -173,7 +194,6 @@ export default function Home() {
 
   const handleSwap = async () => {
     if (!selectedFile) {
-        // Fallback safety, though UI should prevent this
         setError("Please pick a photo first! 📸");
         return;
     }
@@ -324,93 +344,120 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           
-          {/* 🎬 2. The "Gold Border" Template Selector */}
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            {TEMPLATES.map((t) => (
-                <button
-                key={t.id}
-                onClick={() => setSelectedTemplate(t)}
-                className={`relative rounded-xl overflow-hidden aspect-square transition-all duration-200 flex flex-col items-center justify-center bg-gray-50 ${
-                    selectedTemplate.id === t.id
-                    ? 'border-4 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' 
-                    : 'border-2 border-transparent shadow-sm hover:scale-105 opacity-90'
-                }`}
-                >
-                <span className="text-4xl mb-1">{t.emoji}</span>
-                <span className="text-[10px] sm:text-xs font-bold text-gray-600 px-1 text-center leading-tight">
-                    {t.name}
-                </span>
-                
-                {/* Checkmark Badge for Active State */}
-                {selectedTemplate.id === t.id && (
-                    <div className="absolute top-1 right-1 bg-yellow-400 text-white rounded-full p-1 shadow-sm">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                )}
-                </button>
-            ))}
+          {/* 🎬 TEMPLATE SELECTOR (NETFLIX STYLE) */}
+          <div className="mb-8">
+            <span className="text-xl font-bold mb-4 block text-teal-800 tracking-tight">👇 Choose your Magic</span>
+            <div className="flex overflow-x-auto gap-4 pb-6 snap-x px-2 scrollbar-hide">
+                {TEMPLATES.map((t) => (
+                    <button
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(t)}
+                        className={`flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden transition-all duration-300 relative snap-center group shadow-md ${
+                            selectedTemplate.id === t.id 
+                            ? 'ring-4 ring-yellow-400 scale-105 z-10 shadow-xl' 
+                            : 'ring-1 ring-gray-100 hover:scale-105 opacity-90'
+                        }`}
+                    >
+                        {/* THUMBNAIL */}
+                        <img 
+                            src={t.thumb} 
+                            alt={t.name}
+                            className="w-full h-full object-cover"
+                        />
+
+                        {/* BADGE */}
+                        {t.badge && (
+                            <span className="absolute top-2 right-2 bg-yellow-400 text-red-800 text-[10px] font-black px-2 py-1 rounded-full shadow-sm z-20 transform rotate-3">
+                                {t.badge}
+                            </span>
+                        )}
+                        
+                        {/* CHECKMARK */}
+                        {selectedTemplate.id === t.id && (
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                <div className="bg-yellow-400 text-white rounded-full p-2 shadow-lg transform scale-110">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TITLE BAR */}
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
+                            <span className="text-xs font-bold text-white block text-center shadow-black drop-shadow-md">
+                                {t.name}
+                            </span>
+                        </div>
+                    </button>
+                ))}
+            </div>
           </div>
 
-          {/* 3. The "Magic Mirror" Upload Button */}
-          <p className="text-center text-gray-600 mb-3 text-lg">
-            For the best magic, pick a photo of <span className="font-bold text-pink-500">JUST one face! ✨</span>
-          </p>
-
-          <label className="block w-full cursor-pointer relative group">
-            <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-            />
-            <div className={`w-full h-40 rounded-2xl bg-white shadow-inner transition-all flex flex-col items-center justify-center overflow-hidden
-                ${selectedFile 
-                ? 'border-4 border-teal-400 ring-4 ring-teal-50' 
-                : 'border-2 border-dashed border-pink-200 group-hover:border-pink-400 group-hover:bg-pink-50'
-                }`}
-            >
-                {selectedFile ? (
-                <div className="relative w-full h-full">
-                    <img 
-                    src={URL.createObjectURL(selectedFile)} 
-                    className="w-full h-full object-cover opacity-80" 
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <span className="bg-white px-4 py-2 rounded-full font-bold text-teal-700 shadow-lg flex items-center gap-2">
-                        ✅ Photo Ready!
-                    </span>
+          {/* 📸 SOLID UPLOAD BUTTON */}
+          <div className="mb-8">
+             <p className="text-center text-gray-500 mb-3 font-medium text-lg">
+                Upload a photo of <span className="font-bold text-pink-500">JUST one face!</span> ✨
+             </p>
+             
+             <label className="block w-full cursor-pointer relative group transition-transform active:scale-95">
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                
+                <div className={`w-full h-48 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden transition-all duration-300
+                    ${selectedFile 
+                    ? 'bg-white border-4 border-teal-400' 
+                    : 'bg-white hover:shadow-2xl border border-gray-100'
+                    }`}
+                >
+                    {selectedFile ? (
+                    <div className="relative w-full h-full">
+                        <img 
+                        src={URL.createObjectURL(selectedFile)} 
+                        className="w-full h-full object-cover opacity-90" 
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+                            <span className="bg-white px-6 py-3 rounded-full font-black text-teal-600 shadow-2xl flex items-center gap-2 transform scale-110">
+                                ✅ Photo Ready
+                            </span>
+                        </div>
                     </div>
+                    ) : (
+                    <div className="flex flex-col items-center">
+                        <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                            <span className="text-3xl">📸</span>
+                        </div>
+                        <span className="text-2xl font-black text-gray-800">Pick a Photo</span>
+                        <span className="text-sm text-gray-400 mt-1">Tap to open camera roll</span>
+                    </div>
+                    )}
                 </div>
-                ) : (
-                <>
-                    <span className="text-5xl mb-2 group-hover:scale-110 transition-transform duration-200">📸</span>
-                    <span className="text-xl font-bold text-gray-400 group-hover:text-pink-500">Tap to Upload</span>
-                </>
-                )}
-            </div>
-          </label>
+             </label>
+          </div>
 
-          {/* 4. The "Pulse" Magic Button */}
-          <button
-            onClick={handleSwap}
-            disabled={!selectedFile || isLoading}
-            className={`w-full mt-6 py-5 rounded-2xl text-2xl font-black text-white shadow-xl transition-all duration-300 transform
+          {/* 🛡️ TRUST BANNER */}
+          <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2">
+            <span>🔒</span>
+            <span>Photo deleted automatically.</span>
+          </div>
+
+          {/* ✨ MAGIC BUTTON */}
+          <button 
+            onClick={handleSwap} 
+            disabled={!selectedFile || isLoading} 
+            className={`w-full py-6 rounded-2xl text-2xl font-black text-white shadow-2xl transition-all duration-300 transform
                 ${selectedFile && !isLoading
-                ? 'bg-pink-500 hover:bg-pink-400 hover:scale-[1.02] animate-pulse cursor-pointer shadow-pink-500/40' // Ready State
-                : 'bg-teal-500 opacity-50 cursor-not-allowed grayscale' // Waiting State
+                ? 'bg-pink-500 hover:bg-pink-400 scale-[1.02] animate-pulse cursor-pointer shadow-pink-500/50' 
+                : 'bg-teal-500 hover:bg-teal-400 opacity-100' 
                 }`}
-            >
-            {isLoading ? (
-                <span className="flex items-center justify-center gap-3 text-lg sm:text-xl">
-                <span className="animate-spin text-2xl">⏳</span>
-                {loadingMessage}
+          >
+             {isLoading ? (
+                <span className="flex items-center justify-center gap-3">
+                  <span className="animate-spin text-2xl">⏳</span>
+                  {loadingMessage}
                 </span>
-            ) : (
-                '✨ Make the Magic'
-            )}
+             ) : (
+                selectedFile ? '✨ Make the Magic ✨' : 'Select a Photo First 👆'
+             )}
           </button>
 
-          {/* ERROR DISPLAY */}
           {error && (
             <div className="mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-center gap-3 animate-shake">
               <span className="text-2xl">🧐</span>
@@ -418,18 +465,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* RESULT DISPLAY */}
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800">🎉 Look what your grandbaby made!</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100">
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline muted className="w-full" />
               </div>
-              <button 
-                onClick={handleSmartShare} 
-                disabled={isSharing} 
-                className="block mt-6 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-xl font-black text-center shadow-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
-              >
+              <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-xl font-black text-center shadow-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]">
                 {isSharing ? 'Preparing...' : 'Send to Family Group 🎄❤️'}
               </button>
             </div>
