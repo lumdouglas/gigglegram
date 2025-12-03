@@ -5,15 +5,63 @@ import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
+// 🎬 THE CONTENT LIBRARY (Audio Enabled 🔊)
+const TEMPLATES = [
+  { 
+    id: 'baby_ceo', 
+    name: 'Baby CEO 💼', 
+    emoji: '💼', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4',
+    badge: '🔥 POPULAR' 
+  },
+  { 
+    id: 'cookie_thief', 
+    name: 'Cookie Thief 🍪', 
+    emoji: '🍪', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/cookie_thief.mp4', 
+    badge: '🆕 NEW' 
+  },
+  { 
+    id: 'snowball', 
+    name: 'Snowball Sniper ❄️', 
+    emoji: '❄️', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/snowball_sniper.mp4',
+    badge: '🎄 FESTIVE' 
+  },
+  { 
+    id: 'disco', 
+    name: 'Disco Baby 🕺', 
+    emoji: '🕺', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/disco_baby.mp4',
+    badge: '' 
+  },
+  { 
+    id: 'royal_wave', 
+    name: 'Royal Wave 👑', 
+    emoji: '👑', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/royal_wave.mp4',
+    badge: '' 
+  },
+  { 
+    id: 'bodybuilder', 
+    name: 'Tiny Muscle 💪', 
+    emoji: '💪', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/tiny_bodybuilder.mp4',
+    badge: '' 
+  }
+];
+
+// 🎄 THE GIGGLE LOOP (Jokes + Status) 🎄
+// Logic: Sequential 6s rotation. Holds on the last message if processing takes longer.
 const LOADING_MESSAGES = [
-  "Santa is baking your cookies... 🍪",             
-  "The Elves are polishing the camera lens... 🧝",  
-  "Finding your grandbaby's best smile... 👶",      
-  "Adding a sprinkle of North Pole magic... ✨",    
-  "Rudolph is warming up the sleigh... 🦌",         
-  "Almost there! Don't close your phone... ❤️",     
-  "Wrapping it up with a big red bow... 🎀",        
-  "Here it comes!! 🎄"                              
+  "🍪 Santa is baking your cookies... (Heating up the GPU)",
+  "🎅 Joke: What do elves learn in school? The Elf-abet!",
+  "🧝 The Elves are polishing the camera lens...",
+  "🦌 Joke: What do you call a blind reindeer? No-eye-deer!",
+  "✨ Adding the magic sparkles...",
+  "❄️ Joke: What falls but never gets hurt? Snow!",
+  "🎁 Almost ready! Don't close your phone...",
+  "🎄 Here it comes!! (Just a few more seconds)"
 ];
 
 export default function Home() {
@@ -24,6 +72,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   
+  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
+
   // MONETIZATION STATE
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
@@ -35,7 +85,6 @@ export default function Home() {
   // 1. IDENTITY & CREDIT CHECK
   useEffect(() => {
     const initUser = async () => {
-      // Fingerprint
       try {
         const fp = await FingerprintJS.load();
         const result = await fp.get();
@@ -44,7 +93,6 @@ export default function Home() {
         console.warn("Fingerprint failed");
       }
 
-      // Session/Credits
       const { data: { session } } = await supabase.auth.getSession();
       let currentId = localStorage.getItem('giggle_device_id');
 
@@ -82,19 +130,27 @@ export default function Home() {
     initUser();
   }, []);
 
-  // 2. SANTA WAITING ROOM
+  // 2. THE GIGGLE LOOP (Sequential Logic)
   useEffect(() => {
     if (!isLoading) return;
+    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
+
     const interval = setInterval(() => {
-      msgIndex = (msgIndex + 1);
+      // Increment index
+      msgIndex++;
+      
+      // If we are within range, show the next message
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       } else {
-          setLoadingMessage(LOADING_MESSAGES[0]);
+          // If we run out of messages (48s+), hold on the last one.
+          // Do NOT loop back to the start, as that breaks the "Almost ready" promise.
+          setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
       }
-    }, 5000); 
+    }, 6000); // 6 Seconds per message
+
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -128,7 +184,7 @@ export default function Home() {
       const { data: { publicUrl } } = supabase.storage
         .from('user-uploads').getPublicUrl(filename);
       
-      const targetVideoUrl = "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/baby_ceo.mp4";
+      const targetVideoUrl = selectedTemplate.url;
 
       const startRes = await fetch('/api/swap', {
         method: 'POST',
@@ -214,7 +270,7 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50 relative"> 
       
-      {/* 👤 TOP RIGHT LOGIN / ACCOUNT (De-prioritized) */}
+      {/* 👤 TOP RIGHT LOGIN / ACCOUNT */}
       <div className="absolute top-4 right-4 z-10">
         {userEmail ? (
             <span className="text-xs font-medium text-teal-800 bg-white/50 px-3 py-1 rounded-full border border-teal-100">
@@ -231,7 +287,6 @@ export default function Home() {
         <h1 className="text-5xl font-bold text-center mb-2 text-teal-700">My Grandbaby Runs The World! ❤️</h1>
         <p className="text-center text-gray-600 mb-8 text-lg">The favorite grandbaby magic, just for you ✨</p>
 
-        {/* CREDIT COUNTER */}
         {credits > 0 && (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-4 border-2 border-yellow-300 animate-pulse">
                 ✨ {credits} Magic Credits Remaining
@@ -239,10 +294,47 @@ export default function Home() {
         )}
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <label className="block mb-4">
+          
+          {/* 🎬 TEMPLATE SELECTOR */}
+          <div className="mb-6">
+            <span className="text-xl font-bold mb-3 block text-gray-700">👇 Pick a Magic Scene</span>
+            <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
+                {TEMPLATES.map((t) => (
+                    <button
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(t)}
+                        className={`flex-shrink-0 w-32 h-32 rounded-2xl border-4 transition-all relative snap-center ${
+                            selectedTemplate.id === t.id 
+                            ? 'border-pink-500 bg-pink-50 scale-105 shadow-md' 
+                            : 'border-gray-200 bg-gray-50 hover:border-pink-200'
+                        }`}
+                    >
+                        {t.badge && (
+                            <span className="absolute -top-3 -right-2 bg-yellow-400 text-red-700 text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10 transform rotate-12">
+                                {t.badge}
+                            </span>
+                        )}
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <span className="text-4xl mb-1">{t.emoji}</span>
+                            <span className="text-xs font-bold text-gray-600 px-1 text-center leading-tight">
+                                {t.name}
+                            </span>
+                        </div>
+                    </button>
+                ))}
+            </div>
+          </div>
+
+          <label className="block mb-2">
             <span className="text-2xl font-bold mb-2 block text-gold-700">📸 Pick a Photo 👶</span>
             <input type="file" accept="image/*" onChange={handleFileSelect} className="w-full text-lg p-3 border-2 border-gray-300 rounded-lg" />
           </label>
+
+          {/* 🛡️ TRUST BANNER (The Moat) */}
+          <div className="flex items-center justify-start gap-1 mb-4 text-xs text-gray-400 pl-1">
+            <span>🔒</span>
+            <span>Your photo is deleted immediately after magic.</span>
+          </div>
 
           {selectedFile && (
             <div className="mb-4">
@@ -274,7 +366,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 💰 PAYWALL MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
