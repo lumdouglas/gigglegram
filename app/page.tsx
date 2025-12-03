@@ -51,7 +51,7 @@ const TEMPLATES = [
   }
 ];
 
-// 🎅 THE GIGGLE LOOP (Jokes + Status)
+// 🎄 THE GIGGLE LOOP (Jokes + Status)
 const LOADING_MESSAGES = [
   "🍪 Santa is baking your cookies... (Heating up the GPU)",
   "🎅 Joke: What do elves learn in school? The Elf-abet!",
@@ -80,9 +80,32 @@ export default function Home() {
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
+  
+  // PASSWORD STATE
+  const [isLocked, setIsLocked] = useState(true);
+  const [passwordInput, setPasswordInput] = useState('');
+
+  // 0. CHECK PASSWORD (On Load)
+  useEffect(() => {
+    const isUnlocked = localStorage.getItem('site_unlocked');
+    if (isUnlocked === 'true') {
+        setIsLocked(false);
+    }
+  }, []);
+
+  const handleUnlock = () => {
+      if (passwordInput.toLowerCase() === 'doug') {
+          setIsLocked(false);
+          localStorage.setItem('site_unlocked', 'true');
+      } else {
+          alert('Wrong password! Ask Doug.');
+      }
+  };
 
   // 1. IDENTITY & CREDIT CHECK
   useEffect(() => {
+    if (isLocked) return;
+
     const initUser = async () => {
       try {
         const fp = await FingerprintJS.load();
@@ -127,7 +150,7 @@ export default function Home() {
       }
     };
     initUser();
-  }, []);
+  }, [isLocked]);
 
   // 2. THE GIGGLE LOOP
   useEffect(() => {
@@ -228,11 +251,11 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
-      // 🛡️ NANA-FRIENDLY ERROR HANDLING
+      // 🛡️ NANA-FRIENDLY ERROR HANDLING (Updated)
       const errorMsg = (err.message || '').toLowerCase();
       
       if (errorMsg.includes('face') || errorMsg.includes('detect') || errorMsg.includes('found')) {
-          setError("Uh oh! We couldn't find a face. Try a closer photo! 🧐");
+          setError("Uh oh! We couldn't see a face. Try a closer photo of just one person! 🧐");
       } else {
           setError('The magic fizzled out! Try again or pick a different photo. ✨');
       }
@@ -268,6 +291,26 @@ export default function Home() {
     if (!selectedFile) return base + "bg-gray-300 text-gray-500 cursor-not-allowed";
     return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
   };
+
+  if (isLocked) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
+                <h1 className="text-4xl mb-4">🚧</h1>
+                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
+                <p className="text-gray-500 mb-6">Testing in progress. Enter password.</p>
+                <input
+                    type="password"
+                    placeholder="Password"
+                    className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                />
+                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50 relative"> 
@@ -327,10 +370,18 @@ export default function Home() {
             </div>
           </div>
 
-          <label className="block mb-2">
-            <span className="text-2xl font-bold mb-2 block text-gold-700">📸 Pick a Photo 👶</span>
-            <input type="file" accept="image/*" onChange={handleFileSelect} className="w-full text-lg p-3 border-2 border-gray-300 rounded-lg" />
-          </label>
+          {/* GUIDED UPLOAD UI */}
+          <div className="mb-4">
+             <p className="text-center text-gray-600 mb-2 font-medium">
+                For the best magic, pick a photo of <span className="font-bold text-red-500">JUST one face!</span> ✨
+             </p>
+             <label className="block cursor-pointer hover:opacity-90 transition-opacity">
+                <span className="text-2xl font-bold mb-2 block text-gold-700 text-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl py-4 hover:border-pink-400">
+                  Pick a Photo 📸
+                </span>
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+             </label>
+          </div>
 
           {/* 🛡️ TRUST BANNER */}
           <div className="flex items-center justify-start gap-1 mb-4 text-xs text-gray-400 pl-1">
