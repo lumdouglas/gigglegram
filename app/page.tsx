@@ -51,17 +51,15 @@ const TEMPLATES = [
   }
 ];
 
-// 🎄 THE GIGGLE LOOP (Jokes + Status) 🎄
-// Logic: Sequential 6s rotation. Holds on the last message if processing takes longer.
 const LOADING_MESSAGES = [
-  "🍪 Santa is baking your cookies... (Heating up the GPU)",
-  "🎅 Joke: What do elves learn in school? The Elf-abet!",
-  "🧝 The Elves are polishing the camera lens...",
-  "🦌 Joke: What do you call a blind reindeer? No-eye-deer!",
-  "✨ Adding the magic sparkles...",
-  "❄️ Joke: What falls but never gets hurt? Snow!",
-  "🎁 Almost ready! Don't close your phone...",
-  "🎄 Here it comes!! (Just a few more seconds)"
+  "Santa is baking your cookies... 🍪",             
+  "The Elves are polishing the camera lens... 🧝",  
+  "Finding your grandbaby's best smile... 👶",      
+  "Adding a sprinkle of North Pole magic... ✨",    
+  "Rudolph is warming up the sleigh... 🦌",         
+  "Almost there! Don't close your phone... ❤️",     
+  "Wrapping it up with a big red bow... 🎀",        
+  "Here it comes!! 🎄"                              
 ];
 
 export default function Home() {
@@ -82,8 +80,32 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
 
+  // 🔒 PASSWORD PROTECTION STATE
+  const [isLocked, setIsLocked] = useState(true);
+  const [passwordInput, setPasswordInput] = useState('');
+
+  // 0. CHECK PASSWORD (On Load)
+  useEffect(() => {
+    const isUnlocked = localStorage.getItem('site_unlocked');
+    if (isUnlocked === 'true') {
+        setIsLocked(false);
+    }
+  }, []);
+
+  const handleUnlock = () => {
+      if (passwordInput.toLowerCase() === 'doug') {
+          setIsLocked(false);
+          localStorage.setItem('site_unlocked', 'true');
+      } else {
+          alert('Wrong password! Ask Doug.');
+      }
+  };
+
   // 1. IDENTITY & CREDIT CHECK
   useEffect(() => {
+    // Only run if unlocked
+    if (isLocked) return;
+
     const initUser = async () => {
       try {
         const fp = await FingerprintJS.load();
@@ -128,29 +150,21 @@ export default function Home() {
       }
     };
     initUser();
-  }, []);
+  }, [isLocked]); // Run when unlocked
 
-  // 2. THE GIGGLE LOOP (Sequential Logic)
+  // 2. SANTA WAITING ROOM
   useEffect(() => {
     if (!isLoading) return;
-    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
-
     const interval = setInterval(() => {
-      // Increment index
-      msgIndex++;
-      
-      // If we are within range, show the next message
+      msgIndex = (msgIndex + 1);
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       } else {
-          // If we run out of messages (48s+), hold on the last one.
-          // Do NOT loop back to the start, as that breaks the "Almost ready" promise.
-          setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
+          setLoadingMessage(LOADING_MESSAGES[0]);
       }
-    }, 6000); // 6 Seconds per message
-
+    }, 5000); 
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -267,6 +281,35 @@ export default function Home() {
     return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
   };
 
+  // 🔒 LOCK SCREEN RENDER
+  if (isLocked) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
+                <h1 className="text-4xl mb-4">🚧</h1>
+                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
+                <p className="text-gray-500 mb-6">Testing in progress. Enter password.</p>
+                
+                <input
+                    type="password"
+                    placeholder="Password"
+                    className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                />
+                
+                <button
+                    onClick={handleUnlock}
+                    className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors"
+                >
+                    Unlock
+                </button>
+            </div>
+        </div>
+      );
+  }
+
+  // 🟢 MAIN APP RENDER
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-teal-50 relative"> 
       
@@ -328,59 +371,4 @@ export default function Home() {
           <label className="block mb-2">
             <span className="text-2xl font-bold mb-2 block text-gold-700">📸 Pick a Photo 👶</span>
             <input type="file" accept="image/*" onChange={handleFileSelect} className="w-full text-lg p-3 border-2 border-gray-300 rounded-lg" />
-          </label>
-
-          {/* 🛡️ TRUST BANNER (The Moat) */}
-          <div className="flex items-center justify-start gap-1 mb-4 text-xs text-gray-400 pl-1">
-            <span>🔒</span>
-            <span>Your photo is deleted immediately after magic.</span>
-          </div>
-
-          {selectedFile && (
-            <div className="mb-4">
-              <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-full rounded-lg max-h-64 object-cover" />
-            </div>
-          )}
-
-          <button onClick={handleSwap} disabled={!selectedFile || isLoading} className={getButtonStyle()}>
-             {isLoading ? <span className="flex items-center justify-center gap-2">⏳ {loadingMessage}</span> : '✨ Make the Magic'}
-          </button>
-
-          {error && (
-            <div className="mt-4 p-4 bg-red-100 border-2 border-red-300 rounded-lg">
-              <p className="text-red-700 text-lg">❌ {error}</p>
-            </div>
-          )}
-
-          {resultVideoUrl && (
-            <div className="mt-6">
-              <h2 className="text-2xl font-bold mb-3">🎉 Look what your grandbaby made!</h2>
-              <div className="relative rounded-lg shadow-lg overflow-hidden">
-                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline muted className="w-full" />
-              </div>
-              <button onClick={handleSmartShare} disabled={isSharing} className="block mt-4 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-2xl font-bold text-center min-h-[70px] shadow-lg flex items-center justify-center gap-2">
-                {isSharing ? 'Preparing...' : 'Send to Family Group 🎄❤️'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showPaywall && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
-            <div className="text-5xl mb-4">🎄</div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Woah! You loved that one?</h3>
-            <p className="text-gray-600 mb-6">Unlock <span className="font-bold text-pink-600">10 more magical videos</span> for just $4.99!<br/>(That's less than a cup of cocoa! ☕️)</p>
-            <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="block w-full bg-[#FF4F82] hover:bg-[#E03E6E] text-white py-4 rounded-xl text-xl font-bold mb-3">Get 10 Credits ($4.99) ✨</a>
-            <div className="mt-4 border-t border-gray-100 pt-4">
-                <p className="text-gray-500 text-sm mb-2">Already have credits?</p>
-                <a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800">Log in to restore them</a>
-            </div>
-            <button onClick={() => setShowPaywall(false)} className="block mt-6 text-gray-400 text-sm hover:text-gray-600 underline mx-auto">Maybe later</button>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+          </label
