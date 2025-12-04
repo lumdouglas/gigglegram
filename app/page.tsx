@@ -253,11 +253,14 @@ export default function Home() {
                 .update({ free_swap_used: true, credits_remaining: newCredits })
                 .eq('device_id', deviceId);
 
+            // 📳 HAPTIC NOTIFICATION (Buzz the phone!)
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]); // Buzz-pause-Buzz
+            }
+
             setResultVideoUrl(checkData.output);
             setIsLoading(false);
             break;
-        } else if (checkData.status === 'failed') {
-            throw new Error(checkData.error || 'Magic failed');
         }
       }
 
@@ -473,7 +476,15 @@ export default function Home() {
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800">🎉 Look what your grandbaby made!</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100">
-                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline muted className="w-full" />
+                {/* REMOVED 'muted' property. Added 'playsInline'. */}
+                <video 
+                    src={`${resultVideoUrl}?t=${Date.now()}`} 
+                    controls 
+                    autoPlay 
+                    loop 
+                    playsInline 
+                    className="w-full" 
+                />
               </div>
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-xl font-black text-center shadow-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]">
                 {isSharing ? 'Preparing...' : 'Send to Family Group 🎄❤️'}
