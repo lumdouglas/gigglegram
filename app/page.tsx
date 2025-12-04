@@ -344,46 +344,50 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           
-          {/* 🎬 TEMPLATE SELECTOR (NETFLIX STYLE) */}
-          <div className="mb-8">
-            <span className="text-xl font-bold mb-4 block text-teal-800 tracking-tight">👇 Choose your Magic</span>
-            <div className="flex overflow-x-auto gap-4 pb-6 snap-x px-2 scrollbar-hide">
+          {/* 🎬 TEMPLATE SELECTOR (THUMBNAIL GRID) */}
+          <div className="mb-6">
+            <span className="text-xl font-bold mb-3 block text-gray-700">👇 Pick a Magic Scene</span>
+            {/* Horizontal Scroll Container */}
+            <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
                 {TEMPLATES.map((t) => (
                     <button
                         key={t.id}
                         onClick={() => setSelectedTemplate(t)}
-                        className={`flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden transition-all duration-300 relative snap-center group shadow-md ${
+                        // CHANGE: Adjusted width/height and added flex-shrink-0 to prevent squishing
+                        className={`flex-shrink-0 w-32 h-32 sm:w-36 sm:h-36 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${
                             selectedTemplate.id === t.id 
-                            ? 'ring-4 ring-yellow-400 scale-105 z-10 shadow-xl' 
-                            : 'ring-1 ring-gray-100 hover:scale-105 opacity-90'
+                            ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' 
+                            : 'border-transparent shadow-sm hover:scale-105 opacity-90'
                         }`}
                     >
-                        {/* THUMBNAIL */}
+                        {/* THUMBNAIL IMAGE */}
                         <img 
                             src={t.thumb} 
                             alt={t.name}
-                            className="w-full h-full object-cover"
+                            // CHANGE: Changed object-cover to object-contain to prevent cropping if aspect ratio mismatches
+                            // OR keep object-cover but ensure the container aspect ratio matches your thumbnails (likely 1:1 or 9:16)
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
 
                         {/* BADGE */}
                         {t.badge && (
-                            <span className="absolute top-2 right-2 bg-yellow-400 text-red-800 text-[10px] font-black px-2 py-1 rounded-full shadow-sm z-20 transform rotate-3">
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-red-700 text-[10px] font-black px-2 py-1 rounded-bl-lg shadow-sm z-20">
                                 {t.badge}
                             </span>
                         )}
                         
-                        {/* CHECKMARK */}
+                        {/* CHECKMARK OVERLAY (Active) */}
                         {selectedTemplate.id === t.id && (
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 backdrop-blur-[1px]">
-                                <div className="bg-yellow-400 text-white rounded-full p-2 shadow-lg transform scale-110">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
+                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10">
+                                <div className="bg-yellow-400 text-white rounded-full p-1 shadow-lg">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
                             </div>
                         )}
 
                         {/* TITLE BAR */}
-                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
-                            <span className="text-xs font-bold text-white block text-center shadow-black drop-shadow-md">
+                        <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1">
+                            <span className="text-[10px] font-bold text-white block text-center leading-tight truncate">
                                 {t.name}
                             </span>
                         </div>
