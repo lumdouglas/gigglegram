@@ -62,21 +62,21 @@ const TEMPLATES = [
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.jpg',
     badge: '🚂 CHOO CHOO' 
-  }
+  },
   { 
     id: 'sleigh_ride', 
     name: 'Sleigh Ride', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg',
     badge: '' 
-  }
+  },
   { 
     id: 'kitchen_chaos', 
     name: 'Kitchen Chaos', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg',
     badge: '' 
-  }
+  },
   { 
     id: 'carolers', 
     name: 'Carolers', 
