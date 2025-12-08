@@ -5,91 +5,94 @@ import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-// 🎬 THE CONTENT LIBRARY (Updated Filenames)
+// 🎬 THE CONTENT LIBRARY (6 Free / 6 Premium)
 const TEMPLATES = [
+  // --- THE VIRAL HOOKS (6 FREE) ---
   { 
     id: 'baby_ceo', 
-    name: 'Baby CEO', 
+    name: 'Baby CEO 💼', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg',
-    badge: '🔥 POPULAR' 
+    badge: 'POPULAR' 
   },
   { 
     id: 'cookie_thief', 
-    name: 'Cookie Thief', 
+    name: 'Cookie Thief 🍪', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.jpg',
-    badge: '🆕 NEW' 
+    badge: 'NEW' 
   },
   { 
     id: 'snowball_sniper', 
-    name: 'Snowball Sniper', 
+    name: 'Snowball Sniper ❄️', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg',
-    badge: '🎄 FESTIVE' 
+    badge: '' 
   },
   { 
     id: 'disco_baby', 
-    name: 'Disco Baby', 
+    name: 'Disco Baby 🕺', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg',
     badge: '' 
   },
   { 
-    id: 'royal_wave', 
-    name: 'Royal Wave', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
-    badge: '' 
-  },
-  { 
     id: 'tiny_bodybuilder', 
-    name: 'Tiny Muscle', 
+    name: 'Tiny Muscle 💪', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg',
     badge: '' 
   },
   { 
     id: 'conductor', 
-    name: 'The Conductor', 
+    name: 'The Conductor 🚂', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg',
     badge: '' 
   },
+
+  // --- THE UPSELL COLLECTION (6 PREMIUM) ---
+  { 
+    id: 'royal_wave', 
+    name: 'Royal Wave 👑', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4',
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
+    badge: 'PREMIUM' 
+  },
   { 
     id: 'north_pole', 
-    name: 'North Pole Express', 
+    name: 'North Pole Express 🏔️', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.jpg',
-    badge: '🚂 CHOO CHOO' 
+    badge: 'PREMIUM' 
   },
   { 
     id: 'sleigh_ride', 
-    name: 'Sleigh Ride', 
+    name: 'Sleigh Ride 🛷', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg',
-    badge: '' 
+    badge: 'PREMIUM' 
   },
   { 
     id: 'kitchen_chaos', 
-    name: 'Kitchen Chaos', 
+    name: 'Kitchen Chaos 🍳', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg',
-    badge: '' 
+    badge: 'PREMIUM' 
   },
   { 
     id: 'carolers', 
-    name: 'Carolers', 
+    name: 'The Carolers 🎶', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg',
-    badge: '' 
+    badge: 'PREMIUM' 
   },
   { 
-    id: 'cloud_angel', 
-    name: 'Cloud Angel', 
+    id: 'angel_cloud', 
+    name: 'Angel Cloud ☁️', 
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.jpg',
-    badge: '' 
+    badge: 'PREMIUM' 
   }
 ];
 
@@ -115,19 +118,20 @@ export default function Home() {
   
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
-  // MONETIZATION & AUTH STATE
+  // MONETIZATION STATE
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [credits, setCredits] = useState(0);
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
+  const [paywallReason, setPaywallReason] = useState('credits'); // 'credits' or 'premium'
   
   // PASSWORD STATE
   const [isLocked, setIsLocked] = useState(true);
   const [passwordInput, setPasswordInput] = useState('');
 
-  // 0. CHECK PASSWORD (On Load)
+  // 0. CHECK PASSWORD
   useEffect(() => {
     const isUnlocked = localStorage.getItem('site_unlocked');
     if (isUnlocked === 'true') {
@@ -226,7 +230,16 @@ export default function Home() {
         return;
     }
 
+    // 🛑 PREMIUM GATEKEEPER 🛑
+    if (selectedTemplate.badge === 'PREMIUM' && credits <= 0) {
+        setPaywallReason('premium');
+        setShowPaywall(true); 
+        return;
+    }
+
+    // 🛑 SOFT LOCK
     if (freeUsed && credits <= 0) {
+        setPaywallReason('credits');
         setShowPaywall(true); 
         return; 
     }
@@ -260,6 +273,7 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
+          setPaywallReason('credits');
           setShowPaywall(true); 
           return;
       }
@@ -281,14 +295,16 @@ export default function Home() {
                 .update({ free_swap_used: true, credits_remaining: newCredits })
                 .eq('device_id', deviceId);
 
-            // 📳 HAPTIC NOTIFICATION (Buzz the phone!)
+            // 📳 VIBRATE
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate([200, 100, 200]); // Buzz-pause-Buzz
+                navigator.vibrate([200, 100, 200]);
             }
 
             setResultVideoUrl(checkData.output);
             setIsLoading(false);
             break;
+        } else if (checkData.status === 'failed') {
+            throw new Error(checkData.error || 'Magic failed');
         }
       }
 
@@ -327,11 +343,19 @@ export default function Home() {
     }
   };
 
+  const getButtonStyle = () => {
+    const base = "w-full py-4 rounded-xl text-2xl font-bold transition-all min-h-[70px] ";
+    if (isLoading) return base + "bg-pink-600 text-white cursor-wait animate-pulse shadow-inner";
+    if (!selectedFile) return base + "bg-gray-300 text-gray-500 cursor-not-allowed";
+    return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
+  };
+
   if (isLocked) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
                 <h1 className="text-4xl mb-4">🚧</h1>
+                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
                 <input
                     type="password"
                     placeholder="Password"
@@ -339,7 +363,7 @@ export default function Home() {
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
                 />
-                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600">Unlock</button>
+                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
             </div>
         </div>
       );
@@ -383,8 +407,16 @@ export default function Home() {
                 {TEMPLATES.map((t) => (
                     <button
                         key={t.id}
-                        onClick={() => setSelectedTemplate(t)}
-                        // CHANGE: Adjusted width/height and added flex-shrink-0 to prevent squishing
+                        onClick={() => {
+                            if (t.badge === 'PREMIUM' && credits < 1) {
+                                // 🛑 TRAP: Open Paywall immediately for Premium if no credits
+                                setPaywallReason('premium');
+                                setShowPaywall(true); 
+                            } else {
+                                // ✅ ALLOW: Set as active template
+                                setSelectedTemplate(t);
+                            }
+                        }}
                         className={`flex-shrink-0 w-32 h-32 sm:w-36 sm:h-36 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${
                             selectedTemplate.id === t.id 
                             ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' 
@@ -395,14 +427,20 @@ export default function Home() {
                         <img 
                             src={t.thumb} 
                             alt={t.name}
-                            // CHANGE: Changed object-cover to object-contain to prevent cropping if aspect ratio mismatches
-                            // OR keep object-cover but ensure the container aspect ratio matches your thumbnails (likely 1:1 or 9:16)
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
 
-                        {/* BADGE */}
-                        {t.badge && (
-                            <span className="absolute top-0 right-0 bg-yellow-400 text-red-700 text-[10px] font-black px-2 py-1 rounded-bl-lg shadow-sm z-20">
+                        {/* VISUAL BADGE LOGIC */}
+                        {t.badge === 'PREMIUM' ? (
+                            <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 p-1.5 rounded-full shadow-md z-20">
+                                {/* Heroicons Lock (Solid) */}
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                    <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                        ) : t.badge && (
+                            <span className={`absolute top-0 right-0 text-[10px] font-black px-2 py-1 rounded-bl-lg shadow-sm z-20
+                                ${t.badge === 'POPULAR' ? 'bg-pink-500 text-white' : 'bg-blue-500 text-white'}`}>
                                 {t.badge}
                             </span>
                         )}
@@ -427,15 +465,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 📸 SOLID UPLOAD BUTTON */}
           <div className="mb-8">
              <p className="text-center text-gray-500 mb-3 font-medium text-lg">
                 Upload a photo of <span className="font-bold text-pink-500">JUST one face!</span> ✨
              </p>
-             
              <label className="block w-full cursor-pointer relative group transition-transform active:scale-95">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                
                 <div className={`w-full h-48 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden transition-all duration-300
                     ${selectedFile 
                     ? 'bg-white border-4 border-teal-400' 
@@ -467,13 +502,11 @@ export default function Home() {
              </label>
           </div>
 
-          {/* 🛡️ TRUST BANNER */}
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2">
             <span>🔒</span>
             <span>Photo deleted automatically.</span>
           </div>
 
-          {/* ✨ MAGIC BUTTON */}
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading} 
@@ -504,7 +537,6 @@ export default function Home() {
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800">🎉 Look what your grandbaby made!</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100">
-                {/* REMOVED 'muted' property. Added 'playsInline'. */}
                 <video 
                     src={`${resultVideoUrl}?t=${Date.now()}`} 
                     controls 
@@ -526,9 +558,14 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in border-4 border-pink-200">
             <div className="text-6xl mb-4">🎄</div>
-            <h3 className="text-2xl font-black text-gray-800 mb-2">Woah! You loved that one?</h3>
+            <h3 className="text-2xl font-black text-gray-800 mb-2">
+                {paywallReason === 'premium' ? '🔒 Premium Adventure!' : 'Woah! You loved that one?'}
+            </h3>
             <p className="text-gray-600 mb-8 font-medium">
-              Unlock <span className="font-bold text-pink-600 bg-pink-50 px-2 py-1 rounded-lg">10 more magical videos</span> for just $4.99!
+              {paywallReason === 'premium' 
+                ? "This magical scene is locked! Unlock the full collection to use it."
+                : "Unlock 10 more magical videos for just $4.99!"
+              }
               <br/><span className="text-sm text-gray-400 mt-2 block">(That's less than a cup of cocoa! ☕️)</span>
             </p>
             
