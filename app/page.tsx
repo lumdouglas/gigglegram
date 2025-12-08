@@ -83,7 +83,7 @@ const TEMPLATES = [
     url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4',
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg',
     badge: '' 
-  }
+  },
   { 
     id: 'cloud_angel', 
     name: 'Cloud Angel', 
