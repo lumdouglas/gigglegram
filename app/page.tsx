@@ -4,102 +4,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import TEMPLATES from '@/config/templates.json'; // ✅ USES YOUR JSON SOURCE OF TRUTH
 
-// 🎬 THE LAUNCH 12 CONTENT LIBRARY (Final Manifest)
-// Base URL for Supabase Storage
-const STORAGE_BASE = 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/';
-
-const TEMPLATES = [
-  // --- FREE TIER (The Viral Hooks) ---
-  { 
-    id: 'baby_ceo', 
-    name: 'Baby CEO 💼', 
-    url: `${STORAGE_BASE}1_baby_ceo.mp4`, 
-    thumb: `${STORAGE_BASE}1_baby_ceo.jpg`,
-    badge: 'POPULAR' 
-  },
-  { 
-    id: 'cookie_thief', 
-    name: 'Cookie Thief 🍪', 
-    url: `${STORAGE_BASE}2_cookie_thief.mp4`, 
-    thumb: `${STORAGE_BASE}2_cookie_thief.jpg`,
-    badge: 'NEW' 
-  },
-  { 
-    id: 'snowball_sniper', 
-    name: 'Snowball Sniper ❄️', 
-    url: `${STORAGE_BASE}3_snowball_sniper.mp4`, 
-    thumb: `${STORAGE_BASE}3_snowball_sniper.jpg`,
-    badge: '' 
-  },
-  { 
-    id: 'disco_baby', 
-    name: 'Disco Baby 🕺', 
-    url: `${STORAGE_BASE}4_disco_baby.mp4`, 
-    thumb: `${STORAGE_BASE}4_disco_baby.jpg`,
-    badge: '' 
-  },
-  { 
-    id: 'royal_wave', 
-    name: 'Royal Wave 👑', 
-    url: `${STORAGE_BASE}5_royal_wave.mp4`, 
-    thumb: `${STORAGE_BASE}5_royal_wave.jpg`,
-    badge: '' 
-  },
-  { 
-    id: 'tiny_bodybuilder', 
-    name: 'Tiny Bodybuilder 🏋️', 
-    url: `${STORAGE_BASE}6_tiny_bodybuilder.mp4`, 
-    thumb: `${STORAGE_BASE}6_tiny_bodybuilder.jpg`,
-    badge: '' 
-  },
-
-  // --- PREMIUM TIER (The Upsell) ---
-  { 
-    id: 'the_conductor', 
-    name: 'The Conductor 🚂', 
-    url: `${STORAGE_BASE}7_conductor.mp4`, 
-    thumb: `${STORAGE_BASE}7_conductor.jpg`,
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'santas_little_helper', 
-    name: "Santa's Little Helper", 
-    url: `${STORAGE_BASE}8_santas_little_helper.mp4`, 
-    thumb: `${STORAGE_BASE}8_santas_little_helper.jpg`,
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'sleigh_ride', 
-    name: 'Sleigh Ride 🛷', 
-    url: `${STORAGE_BASE}9_sleigh_ride.mp4`, 
-    thumb: `${STORAGE_BASE}9_sleigh_ride.jpg`,
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'kitchen_chaos', 
-    name: 'Kitchen Chaos 🧑‍🍳', 
-    url: `${STORAGE_BASE}10_kitchen_chaos.mp4`, 
-    thumb: `${STORAGE_BASE}10_kitchen_chaos.jpg`,
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'the_carolers', 
-    name: 'The Carolers 🎶', 
-    url: `${STORAGE_BASE}11_carolers.mp4`, 
-    thumb: `${STORAGE_BASE}11_carolers.jpg`,
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'cloud_angel', 
-    name: 'Cloud Angel 👼', 
-    url: `${STORAGE_BASE}12_cloud_angel.mp4`, 
-    thumb: `${STORAGE_BASE}12_cloud_angel.jpg`,
-    badge: 'PREMIUM' 
-  }
-];
-
-// 🎅 THE GIGGLE LOOP (Jokes + Status)
+// 🎅 THE GIGGLE LOOP (Status Messages)
 const LOADING_MESSAGES = [
   "🍪 Santa is baking your cookies... (Heating up the GPU)",
   "🎅 Joke: What do elves learn in school? The Elf-abet!",
@@ -119,42 +26,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   
+  // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
   // MONETIZATION STATE
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [credits, setCredits] = useState(0);
+  const [hasChristmasPass, setHasChristmasPass] = useState(false); // ✅ UPDATED STRATEGY
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
-  const [paywallReason, setPaywallReason] = useState('credits'); 
   
-  // PASSWORD STATE
-  const [isLocked, setIsLocked] = useState(true);
-  const [passwordInput, setPasswordInput] = useState('');
-
-  // 0. CHECK PASSWORD
+  // 1. IDENTITY & PASS CHECK
   useEffect(() => {
-    const isUnlocked = localStorage.getItem('site_unlocked');
-    if (isUnlocked === 'true') {
-        setIsLocked(false);
-    }
-  }, []);
-
-  const handleUnlock = () => {
-      if (passwordInput.toLowerCase() === 'doug') {
-          setIsLocked(false);
-          localStorage.setItem('site_unlocked', 'true');
-      } else {
-          alert('Wrong password! Ask Doug.');
-      }
-  };
-
-  // 1. IDENTITY & CREDIT CHECK
-  useEffect(() => {
-    if (isLocked) return;
-
     const initUser = async () => {
       try {
         const fp = await FingerprintJS.load();
@@ -173,49 +57,38 @@ export default function Home() {
       }
       setDeviceId(currentId);
 
-      if (session?.user?.email) {
-        setUserEmail(session.user.email);
-        const { data: emailUser } = await supabase
-          .from('users').select('*').eq('email', session.user.email).single();
+      // Check DB for this user
+      const lookupId = session?.user?.email ? session.user.email : currentId;
+      const lookupCol = session?.user?.email ? 'email' : 'device_id';
 
-        if (emailUser) {
-            setCredits(emailUser.credits_remaining);
-            setFreeUsed(emailUser.free_swap_used);
-            if (emailUser.device_id !== currentId) {
-                setDeviceId(emailUser.device_id); 
-                localStorage.setItem('giggle_device_id', emailUser.device_id);
-            }
-        }
+      // ⚠️ Make sure your 'users' table has a 'christmas_pass' boolean column!
+      const { data: user } = await supabase
+          .from('users').select('*').eq(lookupCol, lookupId!).single();
+
+      if (user) {
+          setHasChristmasPass(user.christmas_pass || false);
+          setFreeUsed(user.free_swap_used || false);
+          if (session?.user?.email) setUserEmail(session.user.email);
       } else {
-        const { data: deviceUser } = await supabase
-          .from('users').select('*').eq('device_id', currentId).single();
-
-        if (deviceUser) {
-          setCredits(deviceUser.credits_remaining);
-          setFreeUsed(deviceUser.free_swap_used);
-        } else {
-          await supabase.from('users').insert([{ device_id: currentId }]);
-        }
+          // New user
+          if (!session?.user?.email) {
+            await supabase.from('users').insert([{ device_id: currentId }]);
+          }
       }
     };
     initUser();
-  }, [isLocked]);
+  }, []);
 
-  // 2. THE GIGGLE LOOP
+  // 2. THE GIGGLE LOOP ANIMATION
   useEffect(() => {
     if (!isLoading) return;
-    
     let msgIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]); 
 
     const interval = setInterval(() => {
       msgIndex++;
-      if (msgIndex < LOADING_MESSAGES.length) {
-          setLoadingMessage(LOADING_MESSAGES[msgIndex]);
-      } else {
-          setLoadingMessage(LOADING_MESSAGES[LOADING_MESSAGES.length - 1]);
-      }
-    }, 6000); 
+      setLoadingMessage(LOADING_MESSAGES[msgIndex % LOADING_MESSAGES.length]);
+    }, 4000); 
 
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -233,92 +106,67 @@ export default function Home() {
         return;
     }
 
-    // 🛑 PREMIUM GATEKEEPER
-    if (selectedTemplate.badge === 'PREMIUM' && credits <= 0) {
-        setPaywallReason('premium');
+    // 🛑 PREMIUM GATEKEEPER (The Christmas Pass Logic)
+    if (selectedTemplate.isPremium && !hasChristmasPass) {
         setShowPaywall(true); 
         return;
-    }
-
-    // 🛑 SOFT LOCK
-    if (freeUsed && credits <= 0) {
-        setPaywallReason('credits');
-        setShowPaywall(true); 
-        return; 
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const filename = `${Date.now()}-${selectedFile.name}`;
+      // ✅ FIX: Use the 'uploads' bucket we made public in the previous step
+      const filename = `${deviceId}-${Date.now()}.jpg`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-uploads').upload(filename, selectedFile);
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-uploads').getPublicUrl(filename);
+        .from('uploads') // CHANGED FROM 'user-uploads'
+        .upload(filename, selectedFile);
       
-      const targetVideoUrl = selectedTemplate.url;
+      if (uploadError) throw new Error("Upload failed: " + uploadError.message);
 
+      // 3. START THE MAGIC
       const startRes = await fetch('/api/swap', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'x-device-id': fingerprint || 'unknown',
-            'x-user-credits': credits.toString()
+            'x-device-id': fingerprint || 'unknown'
         },
-        body: JSON.stringify({ sourceImage: publicUrl, targetVideo: targetVideoUrl }),
+        body: JSON.stringify({ 
+            templateId: selectedTemplate.id, // Send ID, let backend find URL
+            imageKey: filename // Send filename, let backend build URL
+        }),
       });
       
       const startData = await startRes.json();
-      
-      if (startRes.status === 402) {
-          setIsLoading(false);
-          setFreeUsed(true); 
-          setPaywallReason('credits');
-          setShowPaywall(true); 
-          return;
-      }
-      
-      if (!startData.success) throw new Error(startData.error || 'Failed to start magic');
-      const predictionId = startData.id;
+      if (!startRes.ok) throw new Error(startData.error || 'Failed to start magic');
 
+      const predictionId = startData.predictionId;
+
+      // 4. POLL FOR RESULTS
       while (true) {
         await new Promise(r => setTimeout(r, 3000));
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            setFreeUsed(true);
-            const newCredits = credits > 0 ? credits - 1 : 0;
-            setCredits(newCredits);
-
-            await supabase.from('users')
-                .update({ free_swap_used: true, credits_remaining: newCredits })
-                .eq('device_id', deviceId);
-
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate([200, 100, 200]);
-            }
-
             setResultVideoUrl(checkData.output);
             setIsLoading(false);
+            
+            // Mark free usage if they haven't paid
+            if (!hasChristmasPass) {
+                setFreeUsed(true);
+                await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+            }
             break;
-        } else if (checkData.status === 'failed') {
-            throw new Error(checkData.error || 'Magic failed');
+        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+            throw new Error('The magic fizzled out! Try a different photo.');
         }
       }
 
     } catch (err: any) {
       console.error("Swap Error:", err);
       setIsLoading(false);
-      const errorMsg = (err.message || '').toLowerCase();
-      if (errorMsg.includes('face') || errorMsg.includes('detect') || errorMsg.includes('found')) {
-          setError("Uh oh! We couldn't see a face. Try a closer photo of just one person! 🧐");
-      } else {
-          setError('The magic fizzled out! Try again or pick a different photo. ✨');
-      }
+      setError('The magic fizzled out! Try again or pick a different photo. ✨');
     }
   };
 
@@ -330,46 +178,17 @@ export default function Home() {
         text: 'Look what I made 😂\nMyGiggleGram.com - you have to try this! 🎄',
     };
     try {
-        const response = await fetch(resultVideoUrl);
-        const blob = await response.blob();
-        const file = new File([blob], 'gigglegram.mp4', { type: 'video/mp4' });
-        if (navigator.share && navigator.canShare({ files: [file] })) {
-            await navigator.share({ ...shareData, files: [file] });
+        if (navigator.share) {
+            await navigator.share({ ...shareData, url: resultVideoUrl });
         } else {
-            window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text + " " + resultVideoUrl)}`, '_blank');
         }
     } catch (err) {
-        window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text)}`, '_blank');
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text + " " + resultVideoUrl)}`, '_blank');
     } finally {
         setIsSharing(false);
     }
   };
-
-  const getButtonStyle = () => {
-    const base = "w-full py-4 rounded-xl text-2xl font-bold transition-all min-h-[70px] ";
-    if (isLoading) return base + "bg-pink-600 text-white cursor-wait animate-pulse shadow-inner";
-    if (!selectedFile) return base + "bg-gray-300 text-gray-500 cursor-not-allowed";
-    return base + "bg-pink-500 hover:bg-pink-600 text-white shadow-lg transform hover:scale-[1.02]";
-  };
-
-  if (isLocked) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
-                <h1 className="text-4xl mb-4">🚧</h1>
-                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
-                <input
-                    type="password"
-                    placeholder="Password"
-                    className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                />
-                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
-            </div>
-        </div>
-      );
-  }
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative"> 
@@ -381,9 +200,7 @@ export default function Home() {
                 👤 {userEmail.split('@')[0]}
             </span>
         ) : (
-            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">
-                Log In
-            </a>
+             <span className="text-xs font-bold text-teal-700">MyGiggleGram 🎄</span>
         )}
       </div>
 
@@ -393,9 +210,9 @@ export default function Home() {
         </h1>
         <p className="text-center text-gray-600 mb-8 text-lg font-medium">The favorite grandbaby magic, just for you ✨</p>
 
-        {credits > 0 && (
+        {hasChristmasPass && (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce shadow-sm">
-                ✨ {credits} Magic Credits Remaining
+                ✨ Christmas VIP Pass Active
             </div>
         )}
 
@@ -409,8 +226,8 @@ export default function Home() {
                     <button
                         key={t.id}
                         onClick={() => {
-                            if (t.badge === 'PREMIUM' && credits < 1) {
-                                setPaywallReason('premium');
+                            // If it's premium and they don't have pass, show paywall immediately
+                            if (t.isPremium && !hasChristmasPass) {
                                 setShowPaywall(true); 
                             } else {
                                 setSelectedTemplate(t);
@@ -423,30 +240,21 @@ export default function Home() {
                         }`}
                     >
                         <img 
-                            src={t.thumb} 
+                            src={t.previewImage} 
                             alt={t.name}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
-                        {t.badge === 'PREMIUM' ? (
-                            <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 p-1.5 rounded-full shadow-md z-20">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                                    <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
-                                </svg>
+                        {t.isPremium && !hasChristmasPass && (
+                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full shadow-md z-20 backdrop-blur-sm">
+                                <span className="text-xs">🔒</span>
                             </div>
-                        ) : t.badge && (
-                            <span className={`absolute top-0 right-0 text-[10px] font-black px-2 py-1 rounded-bl-lg shadow-sm z-20
-                                ${t.badge === 'POPULAR' ? 'bg-pink-500 text-white' : 'bg-blue-500 text-white'}`}>
-                                {t.badge}
+                        )}
+                        {!t.isPremium && (
+                            <span className="absolute top-0 right-0 text-[10px] font-black px-2 py-1 rounded-bl-lg shadow-sm z-20 bg-emerald-500 text-white">
+                                FREE
                             </span>
                         )}
                         
-                        {selectedTemplate.id === t.id && (
-                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10">
-                                <div className="bg-yellow-400 text-white rounded-full p-1 shadow-lg">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
-                                </div>
-                            </div>
-                        )}
                         <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1">
                             <span className="text-[10px] font-bold text-white block text-center leading-tight truncate">
                                 {t.name}
@@ -457,10 +265,8 @@ export default function Home() {
             </div>
           </div>
 
+          {/* UPLOAD & ACTION AREA */}
           <div className="mb-8">
-             <p className="text-center text-gray-500 mb-3 font-medium text-lg">
-                Upload a photo of <span className="font-bold text-pink-500">JUST one face!</span> ✨
-             </p>
              <label className="block w-full cursor-pointer relative group transition-transform active:scale-95">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                 <div className={`w-full h-48 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden transition-all duration-300
@@ -494,11 +300,6 @@ export default function Home() {
              </label>
           </div>
 
-          <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2">
-            <span>🔒</span>
-            <span>Photo deleted automatically.</span>
-          </div>
-
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading} 
@@ -530,7 +331,7 @@ export default function Home() {
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800">🎉 Look what your grandbaby made!</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100">
                 <video 
-                    src={`${resultVideoUrl}?t=${Date.now()}`} 
+                    src={resultVideoUrl} 
                     controls 
                     autoPlay 
                     loop 
@@ -546,39 +347,35 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 🎄 CHRISTMAS PASS PAYWALL MODAL */}
       {showPaywall && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in border-4 border-pink-200">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-emerald-200 relative overflow-hidden">
+             
+             {/* Close Button */}
+             <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+             </button>
+
             <div className="text-6xl mb-4">🎄</div>
-            <h3 className="text-2xl font-black text-gray-800 mb-2">
-                {paywallReason === 'premium' ? '🔒 Premium Adventure!' : 'Woah! You loved that one?'}
+            <h3 className="text-2xl font-black text-gray-800 mb-2 leading-tight">
+                Unlock the<br/>Christmas Family Pack!
             </h3>
             <p className="text-gray-600 mb-8 font-medium">
-              {paywallReason === 'premium' 
-                ? "This magical scene is locked! Unlock the full collection to use it."
-                : "Unlock 10 more magical videos for just $4.99!"
-              }
-              <br/><span className="text-sm text-gray-400 mt-2 block">(That's less than a cup of cocoa! ☕️)</span>
+              You found a <b>Premium Magic</b> template!<br/>
+              Unlock Sleigh Rides, Family Carols, and remove all watermarks forever.
             </p>
             
+            {/* ⚠️ REPLACE THIS LINK WITH YOUR $29.99 LEMON SQUEEZY CHECKOUT LINK */}
             <a 
-              href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
-              className="block w-full bg-[#FF4F82] hover:bg-[#E03E6E] text-white py-4 rounded-2xl text-xl font-black mb-4 shadow-lg shadow-pink-200 transform transition-transform hover:scale-105"
+              href={`https://mygigglegram.lemonsqueezy.com/buy/YOUR_VARIANT_ID_HERE?checkout[custom][device_id]=${deviceId}`}
+              className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl text-xl font-black mb-4 shadow-lg shadow-emerald-200 transform transition-transform hover:scale-105 flex items-center justify-center gap-2"
             >
-              Get 10 Credits ($4.99) ✨
+              <span>Get Christmas Access</span>
+              <span>$29.99</span>
             </a>
             
-            <div className="border-t border-gray-100 pt-4">
-                <p className="text-gray-400 text-sm mb-1">Already have credits?</p>
-                <a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800">Log in to restore them</a>
-            </div>
-            
-            <button 
-              onClick={() => setShowPaywall(false)}
-              className="block mt-6 text-gray-400 text-sm hover:text-gray-600 underline mx-auto"
-            >
-              Maybe later
-            </button>
+            <p className="text-xs text-gray-400">One-time payment. Secure & Safe. 🔒</p>
           </div>
         </div>
       )}
