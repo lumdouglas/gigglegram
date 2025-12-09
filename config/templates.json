@@ -1,122 +1,98 @@
 [
-  {
-    "id": "cookie_thief",
-    "name": "Cookie Thief 🍪",
-    "description": "Caught stealing Santa's cookies!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.jpg",
-    "isPremium": false,
-    "gender": "neutral",
-    "type": "solo"
+  { 
+    "id": "baby_ceo", 
+    "name": "Baby CEO 💼", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4",
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg",
+    "badge": "POPULAR",
+    "isPremium": false
   },
-  {
-    "id": "royal_wave",
-    "name": "Royal Wave 👑",
-    "description": "Your royal highness arrives!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg",
-    "isPremium": false,
-    "gender": "girl",
-    "type": "solo"
+  { 
+    "id": "cookie_thief", 
+    "name": "Cookie Thief 🍪", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.jpg",
+    "badge": "NEW",
+    "isPremium": false
   },
-  {
-    "id": "snowball_sniper",
-    "name": "Snowball Sniper ❄️",
-    "description": "The family snowball champion!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg",
-    "isPremium": false,
-    "gender": "neutral",
-    "type": "solo"
+  { 
+    "id": "snowball_sniper", 
+    "name": "Snowball Sniper ❄️", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg",
+    "badge": "WINTER",
+    "isPremium": false
   },
-  {
-    "id": "baby_ceo",
-    "name": "Baby CEO 💼",
-    "description": "The new boss of the family",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg",
-    "isPremium": false,
-    "gender": "neutral",
-    "type": "solo"
+  { 
+    "id": "disco_baby", 
+    "name": "Disco Baby 🕺", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4",
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg",
+    "badge": "",
+    "isPremium": false
   },
-  {
-    "id": "disco_baby",
-    "name": "Disco Baby 🕺",
-    "description": "Grooving into the holidays",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg",
-    "isPremium": false,
-    "gender": "neutral",
-    "type": "solo"
+  { 
+    "id": "royal_wave", 
+    "name": "Royal Wave 👑", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg",
+    "badge": "",
+    "isPremium": false
   },
-  {
-    "id": "tiny_bodybuilder",
-    "name": "Tiny Bodybuilder 🏋️",
-    "description": "World's strongest grandbaby!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg",
-    "isPremium": false,
-    "gender": "neutral",
-    "type": "solo"
+  { 
+    "id": "tiny_bodybuilder", 
+    "name": "Tiny Bodybuilder 🏋️", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg",
+    "badge": "",
+    "isPremium": false
   },
-  {
-    "id": "the_conductor",
-    "name": "The Conductor 🚂",
-    "description": "Driving the Christmas Train",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "aww_bomb"
+  { 
+    "id": "the_conductor", 
+    "name": "The Conductor 🚂", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   },
-  {
-    "id": "santas_little_helper",
-    "name": "Santa's Little Helper 👯",
-    "description": "Dancing with Santa!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_santas_little_helper.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_santas_little_helper.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "duet"
+  { 
+    "id": "santas_little_helper", 
+    "name": "Santa's Helper 👯", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_santas_little_helper.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_santas_little_helper.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   },
-  {
-    "id": "sleigh_ride",
-    "name": "Sleigh Ride 🛷",
-    "description": "Riding with Santa & gifts!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "duet"
+  { 
+    "id": "sleigh_ride", 
+    "name": "Sleigh Ride 🛷", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   },
-  {
-    "id": "the_carolers",
-    "name": "The Carolers 🎶",
-    "description": "Family Holiday Sing-along",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "group"
+  { 
+    "id": "kitchen_chaos", 
+    "name": "Kitchen Chaos 🧑‍🍳", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   },
-  {
-    "id": "cloud_angel",
-    "name": "Cloud Angel 👼",
-    "description": "Your perfect little angel",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "aww_bomb"
+  { 
+    "id": "the_carolers", 
+    "name": "The Carolers 🎶", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   },
-  {
-    "id": "kitchen_chaos",
-    "name": "Kitchen Chaos 🧑‍🍳",
-    "description": "Holiday baking fun!",
-    "videoUrl": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4",
-    "previewImage": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg",
-    "isPremium": true,
-    "gender": "neutral",
-    "type": "duet"
+  { 
+    "id": "cloud_angel", 
+    "name": "Cloud Angel 👼", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4", 
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.jpg",
+    "badge": "PREMIUM",
+    "isPremium": true
   }
 ]

@@ -1,65 +1,92 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
-import templates from '@/config/templates.json';
 
-// Initialize Replicate with the NEW token
+// CRITICAL: Force dynamic to prevent Vercel caching
+export const dynamic = 'force-dynamic';
+
 const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
+  auth: process.env.REPLICATE_API_TOKEN!,
 });
 
-export const dynamic = 'force-dynamic'; // Prevent Vercel caching
-
-// GET: Check Status
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
-
-  const prediction = await replicate.predictions.get(id);
-  return NextResponse.json({ 
-    status: prediction.status, 
-    output: prediction.output 
-  });
-}
-
-// POST: Start the Magic
-export async function POST(req: Request) {
+// 1. POST: STARTS the magic
+export async function POST(request: NextRequest) {
   try {
-    const { templateId, imageKey } = await req.json();
+    const { sourceImage, targetVideo } = await request.json();
 
-    // 1. Get Template Video URL
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return NextResponse.json({ error: 'Invalid template' }, { status: 400 });
-
-    // 2. Build Source Image URL
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const imageUrl = `${supabaseUrl}/storage/v1/object/public/uploads/${imageKey}`;
-
-    console.log("🚀 Fetching latest version of xrunda/hello...");
-
-    // 3. DYNAMIC VERSION FETCH (Fixes the 422 Error)
+    console.log('🎬 Starting Hollywood Face Swap (Async)...');
+    
+    // FETCH VERSION ID (Dynamic - No Hardcoding)
+    console.log("🔍 Fetching latest version of xrunda/hello...");
+    // @ts-ignore
     const model = await replicate.models.get("xrunda", "hello");
-    const latestVersionId = model.latest_version?.id;
+    // @ts-ignore
+    const versionId = model.latest_version?.id;
 
-    if (!latestVersionId) {
-        throw new Error("Model xrunda/hello not found or has no public versions.");
+    if (!versionId) {
+        return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
+    console.log("✅ Version Found:", versionId);
 
-    console.log("🚀 Starting Swap with version:", latestVersionId);
-
-    // 4. Call Replicate
+    // START PREDICTION
+    // Schema: source=video, target=face
     const prediction = await replicate.predictions.create({
-      version: latestVersionId, 
+      version: versionId,
       input: {
-        target_video: template.videoUrl,
-        swap_image: imageUrl
-      }
+        source: targetVideo,   // Template Video
+        target: sourceImage,   // User Face
+        enhance_face: false,   // Realism Config (No Beauty Filter)
+        use_gfpgan: false,
+        face_restore: false,
+        keep_fps: true, 
+        keep_frames: true 
+      },
     });
 
-    return NextResponse.json({ predictionId: prediction.id }, { status: 201 });
+    console.log('🚀 Job Started. ID:', prediction.id);
+
+    return NextResponse.json({ 
+      success: true, 
+      id: prediction.id 
+    });
 
   } catch (error: any) {
-    console.error("❌ Replicate Error:", error);
+    console.error('❌ Start Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// 2. GET: CHECKS the magic
+export async function GET(request: NextRequest) {
+    const id = request.nextUrl.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
+
+    try {
+        const prediction = await replicate.predictions.get(id);
+        
+        // Log status for Vercel monitoring
+        console.log(`📡 Polling ${id}: ${prediction.status}`);
+
+        if (prediction.status === 'succeeded') {
+            // @ts-ignore
+            const output = prediction.output;
+            const finalOutput = Array.isArray(output) ? output[0] : output;
+            
+            return NextResponse.json({ 
+                status: 'succeeded', 
+                output: finalOutput 
+            });
+        }
+        
+        if (prediction.status === 'failed' || prediction.status === 'canceled') {
+            return NextResponse.json({ 
+                status: 'failed', 
+                error: prediction.error 
+            });
+        }
+
+        return NextResponse.json({ status: prediction.status });
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }
