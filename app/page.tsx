@@ -5,94 +5,96 @@ import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-// 🎬 THE CONTENT LIBRARY (6 Free / 6 Premium)
-// Updated based on 'templates.json' with production Supabase URLs
+// 🎬 THE LAUNCH 12 CONTENT LIBRARY (Final Manifest)
+// Base URL for Supabase Storage
+const STORAGE_BASE = 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/';
+
 const TEMPLATES = [
   // --- FREE TIER (The Viral Hooks) ---
   { 
-    id: 'cookie_thief', 
-    name: 'Cookie Thief 🍪', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.jpg',
-    badge: 'NEW' 
+    id: 'baby_ceo', 
+    name: 'Baby CEO 💼', 
+    url: `${STORAGE_BASE}1_baby_ceo.mp4`, 
+    thumb: `${STORAGE_BASE}1_baby_ceo.jpg`,
+    badge: 'POPULAR' 
   },
   { 
-    id: 'royal_wave', 
-    name: 'Royal Wave 👑', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
-    badge: '' // Now Free!
+    id: 'cookie_thief', 
+    name: 'Cookie Thief 🍪', 
+    url: `${STORAGE_BASE}2_cookie_thief.mp4`, 
+    thumb: `${STORAGE_BASE}2_cookie_thief.jpg`,
+    badge: 'NEW' 
   },
   { 
     id: 'snowball_sniper', 
     name: 'Snowball Sniper ❄️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg',
+    url: `${STORAGE_BASE}3_snowball_sniper.mp4`, 
+    thumb: `${STORAGE_BASE}3_snowball_sniper.jpg`,
     badge: '' 
-  },
-  { 
-    id: 'baby_ceo', 
-    name: 'Baby CEO 💼', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg',
-    badge: 'POPULAR' 
   },
   { 
     id: 'disco_baby', 
     name: 'Disco Baby 🕺', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg',
+    url: `${STORAGE_BASE}4_disco_baby.mp4`, 
+    thumb: `${STORAGE_BASE}4_disco_baby.jpg`,
+    badge: '' 
+  },
+  { 
+    id: 'royal_wave', 
+    name: 'Royal Wave 👑', 
+    url: `${STORAGE_BASE}5_royal_wave.mp4`, 
+    thumb: `${STORAGE_BASE}5_royal_wave.jpg`,
     badge: '' 
   },
   { 
     id: 'tiny_bodybuilder', 
     name: 'Tiny Bodybuilder 🏋️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg',
+    url: `${STORAGE_BASE}6_tiny_bodybuilder.mp4`, 
+    thumb: `${STORAGE_BASE}6_tiny_bodybuilder.jpg`,
     badge: '' 
   },
 
   // --- PREMIUM TIER (The Upsell) ---
   { 
-    id: 'north_pole_express', 
+    id: 'the_conductor', 
     name: 'The Conductor 🚂', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg',
+    url: `${STORAGE_BASE}7_conductor.mp4`, 
+    thumb: `${STORAGE_BASE}7_conductor.jpg`,
     badge: 'PREMIUM' 
   },
   { 
-    id: 'disco_divas', 
-    name: 'Santa\'s Helpers 👯', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_disco_divas.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_disco_divas.jpg',
+    id: 'santas_helper', 
+    name: "Santa's Helper 👯", 
+    url: `${STORAGE_BASE}8_santas_little_helper.mp4`, 
+    thumb: `${STORAGE_BASE}8_santas_little_helper.jpg`,
     badge: 'PREMIUM' 
   },
   { 
     id: 'sleigh_ride', 
     name: 'Sleigh Ride 🛷', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg',
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'the_carolers', 
-    name: 'The Carolers 🎶', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg',
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'angel_cloud', 
-    name: 'Cloud Angel 👼', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.jpg',
+    url: `${STORAGE_BASE}9_sleigh_ride.mp4`, 
+    thumb: `${STORAGE_BASE}9_sleigh_ride.jpg`,
     badge: 'PREMIUM' 
   },
   { 
     id: 'kitchen_chaos', 
     name: 'Kitchen Chaos 🧑‍🍳', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4', 
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg',
+    url: `${STORAGE_BASE}10_kitchen_chaos.mp4`, 
+    thumb: `${STORAGE_BASE}10_kitchen_chaos.jpg`,
+    badge: 'PREMIUM' 
+  },
+  { 
+    id: 'the_carolers', 
+    name: 'The Carolers 🎶', 
+    url: `${STORAGE_BASE}11_carolers.mp4`, 
+    thumb: `${STORAGE_BASE}11_carolers.jpg`,
+    badge: 'PREMIUM' 
+  },
+  { 
+    id: 'cloud_angel', 
+    name: 'Cloud Angel 👼', 
+    url: `${STORAGE_BASE}12_cloud_angel.mp4`, 
+    thumb: `${STORAGE_BASE}12_cloud_angel.jpg`,
     badge: 'PREMIUM' 
   }
 ];
@@ -126,7 +128,7 @@ export default function Home() {
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
-  const [paywallReason, setPaywallReason] = useState('credits'); // 'credits' or 'premium'
+  const [paywallReason, setPaywallReason] = useState('credits'); 
   
   // PASSWORD STATE
   const [isLocked, setIsLocked] = useState(true);
@@ -231,7 +233,7 @@ export default function Home() {
         return;
     }
 
-    // 🛑 PREMIUM GATEKEEPER 🛑
+    // 🛑 PREMIUM GATEKEEPER
     if (selectedTemplate.badge === 'PREMIUM' && credits <= 0) {
         setPaywallReason('premium');
         setShowPaywall(true); 
@@ -296,7 +298,6 @@ export default function Home() {
                 .update({ free_swap_used: true, credits_remaining: newCredits })
                 .eq('device_id', deviceId);
 
-            // 📳 VIBRATE
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 navigator.vibrate([200, 100, 200]);
             }
@@ -313,7 +314,7 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       const errorMsg = (err.message || '').toLowerCase();
-      if (errorMsg.includes('face') || errorMsg.includes('detect')) {
+      if (errorMsg.includes('face') || errorMsg.includes('detect') || errorMsg.includes('found')) {
           setError("Uh oh! We couldn't see a face. Try a closer photo of just one person! 🧐");
       } else {
           setError('The magic fizzled out! Try again or pick a different photo. ✨');
@@ -403,38 +404,31 @@ export default function Home() {
           {/* 🎬 TEMPLATE SELECTOR (THUMBNAIL GRID) */}
           <div className="mb-6">
             <span className="text-xl font-bold mb-3 block text-gray-700">👇 Pick a Magic Scene</span>
-            {/* Horizontal Scroll Container */}
             <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
                 {TEMPLATES.map((t) => (
                     <button
                         key={t.id}
                         onClick={() => {
                             if (t.badge === 'PREMIUM' && credits < 1) {
-                                // 🛑 TRAP: Open Paywall immediately for Premium if no credits
                                 setPaywallReason('premium');
                                 setShowPaywall(true); 
                             } else {
-                                // ✅ ALLOW: Set as active template
                                 setSelectedTemplate(t);
                             }
                         }}
-                        className={`flex-shrink-0 w-32 h-32 sm:w-36 sm:h-36 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${
+                        className={`flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${
                             selectedTemplate.id === t.id 
                             ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' 
                             : 'border-transparent shadow-sm hover:scale-105 opacity-90'
                         }`}
                     >
-                        {/* THUMBNAIL IMAGE */}
                         <img 
                             src={t.thumb} 
                             alt={t.name}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
-
-                        {/* VISUAL BADGE LOGIC */}
                         {t.badge === 'PREMIUM' ? (
                             <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 p-1.5 rounded-full shadow-md z-20">
-                                {/* Heroicons Lock (Solid) */}
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                                     <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
                                 </svg>
@@ -446,7 +440,6 @@ export default function Home() {
                             </span>
                         )}
                         
-                        {/* CHECKMARK OVERLAY (Active) */}
                         {selectedTemplate.id === t.id && (
                             <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10">
                                 <div className="bg-yellow-400 text-white rounded-full p-1 shadow-lg">
@@ -454,8 +447,6 @@ export default function Home() {
                                 </div>
                             </div>
                         )}
-
-                        {/* TITLE BAR */}
                         <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1">
                             <span className="text-[10px] font-bold text-white block text-center leading-tight truncate">
                                 {t.name}
