@@ -63,8 +63,8 @@ const TEMPLATES = [
     badge: 'PREMIUM' 
   },
   { 
-    id: 'santas_helper', 
-    name: "Santa's Helper 👯", 
+    id: 'santas_little_helper', 
+    name: "Santa's Little Helper", 
     url: `${STORAGE_BASE}8_santas_little_helper.mp4`, 
     thumb: `${STORAGE_BASE}8_santas_little_helper.jpg`,
     badge: 'PREMIUM' 
