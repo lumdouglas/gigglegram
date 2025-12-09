@@ -218,23 +218,36 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
-    // 🎄 1. THE WHATSAPP SHARE PAYLOAD
-    const babyName = "my grandbaby"; // Hardcoded to avoid friction
-    const shareUrl = "https://MyGiggleGram.com";
-    const shareText = `I made a little magic with ${babyName}'s photo! ✨👶\n\n👇 Tap here to try:\n${shareUrl}`;
+    // 🎄 1. THE MESSAGE PAYLOAD
+    // We add the video link directly in the text so WhatsApp generates a preview card.
+    const babyName = "my grandbaby"; 
+    const shareText = `I made a little magic with ${babyName}'s photo! ✨👶\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it yourself at MyGiggleGram.com`;
 
     try {
+        // ATTEMPT A: Native Share Sheet (Sends actual file if supported)
         if (navigator.share) {
-            await navigator.share({ 
-                title: 'My GiggleGram',
-                text: shareText,
-                url: resultVideoUrl // Some browsers attach the video link here
-            });
-        } else {
-            // Fallback: Manually construct the WhatsApp intent
-            window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
+            // Fetch the video blob to share it as a FILE (Highest Quality)
+            const response = await fetch(resultVideoUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'my-giggle-gram.mp4', { type: 'video/mp4' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'My GiggleGram',
+                    text: shareText
+                });
+                return; // Success!
+            }
         }
+
+        // ATTEMPT B: Fallback (Link Sharing)
+        // If native file share fails, we open WhatsApp with the text + video link
+        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
+
     } catch (err) {
+        // Fallback for errors (e.g., user cancelled share)
+        console.error("Share failed:", err);
         window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
     } finally {
         setIsSharing(false);
