@@ -6,16 +6,16 @@ import { v4 as uuidv4 } from 'uuid';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import TEMPLATES from '@/config/templates.json'; 
 
-// 🎅 THE GIGGLE LOOP (Status Messages)
+// 🎅 THE WAITING ROOM (Narrative Loader - 6s Intervals)
 const LOADING_MESSAGES = [
-  "🍪 Santa is baking your cookies... (Heating up the GPU)",
-  "🎅 Joke: What do elves learn in school? The Elf-abet!",
-  "🧝 The Elves are polishing the camera lens...",
-  "🦌 Joke: What do you call a blind reindeer? No-eye-deer!",
-  "✨ Adding the magic sparkles...",
-  "❄️ Joke: What falls but never gets hurt? Snow!",
-  "🎁 Almost ready! Don't close your phone...",
-  "🎄 Here it comes!! (Just a few more seconds)"
+  "Connecting to the North Pole... 📡❄️",
+  "The elves are finding the magic dust... ✨",
+  "Santa is checking the list (twice!)... 📜🎅",
+  "Oh my goodness, the cuteness levels are HIGH! 👶🥰",
+  "Sprinkling extra holiday cheer... 🎄❤️",
+  "Almost there! Wrapping it up... 🎁",
+  "The reindeer are landing... 🦌🔔",
+  "HERE IT IS! ✨"
 ];
 
 export default function Home() {
@@ -55,7 +55,7 @@ export default function Home() {
           setIsLocked(false);
           localStorage.setItem('site_unlocked', 'true');
       } else {
-          alert('Wrong password!');
+          alert('Wrong password! Ask Doug.');
       }
   };
 
@@ -100,7 +100,7 @@ export default function Home() {
     initUser();
   }, [isLocked]);
 
-  // 2. THE GIGGLE LOOP ANIMATION
+  // 2. THE WAITING ROOM ANIMATION (Strict 6s Interval)
   useEffect(() => {
     if (!isLoading) return;
     let msgIndex = 0;
@@ -108,8 +108,11 @@ export default function Home() {
 
     const interval = setInterval(() => {
       msgIndex++;
-      setLoadingMessage(LOADING_MESSAGES[msgIndex % LOADING_MESSAGES.length]);
-    }, 4000); 
+      // Stop at the last message, don't loop endlessly
+      if (msgIndex < LOADING_MESSAGES.length) {
+          setLoadingMessage(LOADING_MESSAGES[msgIndex]);
+      }
+    }, 6000); 
 
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -168,6 +171,7 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
+          setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
       }
@@ -214,24 +218,33 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
-    // 🎄 UPDATED SHARE MESSAGE
-    const shareData = {
-        title: 'My GiggleGram',
-        text: "I made a little magic with my grandbaby's photo! ✨👶\n\nTry it here: MyGiggleGram.com",
-    };
-    
+    // 🎄 1. THE WHATSAPP SHARE PAYLOAD
+    const babyName = "my grandbaby"; // Hardcoded to avoid friction
+    const shareUrl = "https://MyGiggleGram.com";
+    const shareText = `I made a little magic with ${babyName}'s photo! ✨👶\n\n👇 Tap here to try:\n${shareUrl}`;
+
     try {
         if (navigator.share) {
-            await navigator.share({ ...shareData, url: resultVideoUrl });
+            await navigator.share({ 
+                title: 'My GiggleGram',
+                text: shareText,
+                url: resultVideoUrl // Some browsers attach the video link here
+            });
         } else {
-            // Fallback for desktop/unsupported browsers
-            window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text + " " + resultVideoUrl)}`, '_blank');
+            // Fallback: Manually construct the WhatsApp intent
+            window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
         }
     } catch (err) {
-        window.open(`https://wa.me/?text=${encodeURIComponent(shareData.text + " " + resultVideoUrl)}`, '_blank');
+        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
     } finally {
         setIsSharing(false);
     }
+  };
+
+  const handleDownload = () => {
+      if (resultVideoUrl) {
+          window.open(resultVideoUrl, '_blank');
+      }
   };
 
   if (isLocked) {
@@ -240,7 +253,7 @@ export default function Home() {
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
                 <h1 className="text-4xl mb-4">🚧</h1>
                 <input type="password" placeholder="Password" className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
-                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600">Unlock</button>
+                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
             </div>
         </div>
       );
@@ -248,6 +261,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative">
+      
       <div className="absolute top-4 right-4 z-10">
         {userEmail ? (
             <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100 backdrop-blur-sm">👤 {userEmail.split('@')[0]}</span>
@@ -265,6 +279,8 @@ export default function Home() {
         )}
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
+          
+          {/* TEMPLATE SELECTOR */}
           <div className="mb-6">
             <span className="text-xl font-bold mb-3 block text-gray-700">👇 Pick a Magic Scene</span>
             <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
@@ -286,6 +302,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* UPLOAD & ACTION AREA */}
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group transition-transform active:scale-95">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
@@ -314,13 +331,46 @@ export default function Home() {
 
           {error && <div className="mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-center gap-3 animate-shake"><span className="text-2xl">🧐</span><p className="text-red-700 font-medium leading-tight">{error}</p></div>}
 
+          {/* 3. THE MOMENT OF TRUTH (Success Screen) */}
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
-              <h2 className="text-2xl font-black text-center mb-4 text-teal-800">🎉 Look what your grandbaby made!</h2>
-              <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100">
-                <video src={resultVideoUrl} controls autoPlay loop playsInline className="w-full" />
+              <h2 className="text-2xl font-black text-center mb-4 text-teal-800 leading-tight">✨ It Worked! Look at the magic! ✨</h2>
+              
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
+                <video 
+                    src={`${resultVideoUrl}?t=${Date.now()}`} 
+                    controls 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover" 
+                />
               </div>
-              <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full bg-[#25D366] hover:bg-[#20BA5A] text-white py-4 rounded-xl text-xl font-black text-center shadow-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]">{isSharing ? 'Preparing...' : 'Send to Family Group 🎄❤️'}</button>
+
+              {/* PRIMARY BUTTON: The Money Maker */}
+              <button 
+                onClick={handleSmartShare} 
+                disabled={isSharing} 
+                className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95"
+              >
+                <span className="text-3xl">🚀</span>
+                {isSharing ? 'Opening WhatsApp...' : 'Send to Family Group'}
+              </button>
+
+              {/* SECONDARY BUTTON: Save */}
+              <button 
+                onClick={handleDownload}
+                className="block w-full mt-4 text-gray-500 underline text-sm text-center hover:text-gray-700"
+              >
+                ⬇️ Save to my phone
+              </button>
+
+              {/* TRUST FOOTER */}
+              <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1">
+                <span>🔒</span>
+                <span>Privacy Lock: We are deleting your photo right now.</span>
+              </div>
             </div>
           )}
         </div>
@@ -333,6 +383,7 @@ export default function Home() {
             <div className="text-6xl mb-4">🎄</div>
             <h3 className="text-2xl font-black text-gray-800 mb-2 leading-tight">{paywallReason === 'premium' ? 'Unlock Premium Magic!' : 'Unlock 10 More Videos!'}</h3>
             <p className="text-gray-600 mb-8 font-medium">Get the Christmas Family Pack!<br/>Unlock everything for just $29.99.</p>
+            {/* ⚠️ REPLACE WITH YOUR REAL LINK */}
             <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl text-xl font-black mb-4 shadow-lg shadow-emerald-200 transform transition-transform hover:scale-105 flex items-center justify-center gap-2"><span>Get Christmas Pass</span></a>
             <div className="border-t border-gray-100 pt-4"><p className="text-gray-400 text-sm mb-1">Already have credits?</p><a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800">Log in to restore them</a></div>
             <button onClick={() => setShowPaywall(false)} className="block mt-6 text-gray-400 text-sm hover:text-gray-600 underline mx-auto">Maybe later</button>
