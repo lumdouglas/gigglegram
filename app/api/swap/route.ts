@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
 import templates from '@/config/templates.json';
 
+// Initialize Replicate with the NEW token
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// GET: Check Status of a Prediction (Polling Endpoint)
+export const dynamic = 'force-dynamic'; // Prevent Vercel caching
+
+// GET: Check Status
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
@@ -19,34 +22,44 @@ export async function GET(req: Request) {
   });
 }
 
-// POST: Start a New Prediction (Trigger Endpoint)
+// POST: Start the Magic
 export async function POST(req: Request) {
   try {
     const { templateId, imageKey } = await req.json();
 
-    // 1. Find the Target Video URL from our Config
+    // 1. Get Template Video URL
     const template = templates.find(t => t.id === templateId);
     if (!template) return NextResponse.json({ error: 'Invalid template' }, { status: 400 });
 
-    // 2. Construct the Source Image URL
-    // This assumes your Supabase bucket is named 'uploads' and is set to Public
+    // 2. Build Source Image URL
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const imageUrl = `${supabaseUrl}/storage/v1/object/public/uploads/${imageKey}`;
 
-    // 3. Call Replicate (Model: xrunda/hello)
+    console.log("🚀 Fetching latest version of xrunda/hello...");
+
+    // 3. DYNAMIC VERSION FETCH (Fixes the 422 Error)
+    const model = await replicate.models.get("xrunda", "hello");
+    const latestVersionId = model.latest_version?.id;
+
+    if (!latestVersionId) {
+        throw new Error("Model xrunda/hello not found or has no public versions.");
+    }
+
+    console.log("🚀 Starting Swap with version:", latestVersionId);
+
+    // 4. Call Replicate
     const prediction = await replicate.predictions.create({
-      // We use this specific version hash for consistency
-      version: "5f23854124016a5d4002633010378051287c800880096924b11f375084992524", 
+      version: latestVersionId, 
       input: {
-        swap_image: imageUrl,
-        target_video: template.videoUrl 
+        target_video: template.videoUrl,
+        swap_image: imageUrl
       }
     });
 
     return NextResponse.json({ predictionId: prediction.id }, { status: 201 });
 
   } catch (error: any) {
-    console.error('API Error:', error);
+    console.error("❌ Replicate Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
