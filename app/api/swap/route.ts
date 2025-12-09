@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
+import { createClient } from '@supabase/supabase-js';
 
 // CRITICAL: Force dynamic to prevent Vercel caching
 export const dynamic = 'force-dynamic';
@@ -8,15 +9,55 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN!,
 });
 
+// Initialize Supabase Admin for Guest Checks (Bypass RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 // 1. POST: STARTS the magic
 export async function POST(request: NextRequest) {
   try {
     const { sourceImage, targetVideo } = await request.json();
-
-    console.log('🎬 Starting Hollywood Face Swap (Async)...');
     
-    // FETCH VERSION ID (Dynamic - No Hardcoding)
-    console.log("🔍 Fetching latest version of xrunda/hello...");
+    // SECURITY HEADERS (Sent from page.tsx)
+    const deviceId = request.headers.get('x-device-id') || 'unknown';
+    const userCredits = parseInt(request.headers.get('x-user-credits') || '0');
+    // Get IP (Handle Vercel/Proxy headers)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+
+    console.log(`🎬 Request: Device=${deviceId}, IP=${ip}, Credits Claimed=${userCredits}`);
+
+    // 🛡️ THE GRANDMA FILTER (SOFT LOCK)
+    // Only check guest usage if they claim to have 0 credits.
+    if (userCredits <= 0) {
+        // Check if this device OR IP has already used the free swap
+        const { data: usage } = await supabaseAdmin
+            .from('guest_usage')
+            .select('*')
+            .or(`device_id.eq.${deviceId},ip_address.eq.${ip}`)
+            .maybeSingle();
+
+        if (usage && usage.swaps_count >= 1) {
+            console.warn(`⛔ Soft Lock Blocked: ${ip} / ${deviceId}`);
+            return NextResponse.json({ error: "Free trial used! Log in or upgrade." }, { status: 402 });
+        }
+
+        // If clean, log this usage to "reserve" the spot
+        if (usage) {
+             await supabaseAdmin.from('guest_usage')
+                .update({ swaps_count: usage.swaps_count + 1, last_swap: new Date() })
+                .eq('id', usage.id);
+        } else {
+             await supabaseAdmin.from('guest_usage').insert({
+                 device_id: deviceId,
+                 ip_address: ip,
+                 swaps_count: 1
+             });
+        }
+    }
+
+    // FETCH VERSION ID (Dynamic)
     // @ts-ignore
     const model = await replicate.models.get("xrunda", "hello");
     // @ts-ignore
@@ -25,10 +66,9 @@ export async function POST(request: NextRequest) {
     if (!versionId) {
         return NextResponse.json({ error: "Model version not found" }, { status: 500 });
     }
-    console.log("✅ Version Found:", versionId);
 
     // START PREDICTION
-    // Schema: source=video, target=face
+    // Correct Schema: source=Video, target=Face
     const prediction = await replicate.predictions.create({
       version: versionId,
       input: {
@@ -55,7 +95,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 2. GET: CHECKS the magic
+// 2. GET: CHECKS the magic (Polling)
 export async function GET(request: NextRequest) {
     const id = request.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
@@ -63,7 +103,6 @@ export async function GET(request: NextRequest) {
     try {
         const prediction = await replicate.predictions.get(id);
         
-        // Log status for Vercel monitoring
         console.log(`📡 Polling ${id}: ${prediction.status}`);
 
         if (prediction.status === 'succeeded') {
@@ -71,6 +110,8 @@ export async function GET(request: NextRequest) {
             const output = prediction.output;
             const finalOutput = Array.isArray(output) ? output[0] : output;
             
+            console.log('✅ Success! Output:', finalOutput);
+
             return NextResponse.json({ 
                 status: 'succeeded', 
                 output: finalOutput 
@@ -78,6 +119,7 @@ export async function GET(request: NextRequest) {
         }
         
         if (prediction.status === 'failed' || prediction.status === 'canceled') {
+            console.error('❌ Prediction Failed:', prediction.error);
             return NextResponse.json({ 
                 status: 'failed', 
                 error: prediction.error 
@@ -87,6 +129,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ status: prediction.status });
 
     } catch (error: any) {
+        console.error('❌ Polling Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
