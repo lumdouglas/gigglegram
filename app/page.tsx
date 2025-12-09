@@ -6,15 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 // 🎬 THE CONTENT LIBRARY (6 Free / 6 Premium)
+// Updated based on 'templates.json' with production Supabase URLs
 const TEMPLATES = [
-  // --- THE VIRAL HOOKS (6 FREE) ---
-  { 
-    id: 'baby_ceo', 
-    name: 'Baby CEO 💼', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg',
-    badge: 'POPULAR' 
-  },
+  // --- FREE TIER (The Viral Hooks) ---
   { 
     id: 'cookie_thief', 
     name: 'Cookie Thief 🍪', 
@@ -23,75 +17,82 @@ const TEMPLATES = [
     badge: 'NEW' 
   },
   { 
+    id: 'royal_wave', 
+    name: 'Royal Wave 👑', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
+    badge: '' // Now Free!
+  },
+  { 
     id: 'snowball_sniper', 
     name: 'Snowball Sniper ❄️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg',
     badge: '' 
   },
   { 
+    id: 'baby_ceo', 
+    name: 'Baby CEO 💼', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg',
+    badge: 'POPULAR' 
+  },
+  { 
     id: 'disco_baby', 
     name: 'Disco Baby 🕺', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/4_disco_baby.jpg',
     badge: '' 
   },
   { 
     id: 'tiny_bodybuilder', 
-    name: 'Tiny Muscle 💪', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4',
+    name: 'Tiny Bodybuilder 🏋️', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/6_tiny_bodybuilder.jpg',
     badge: '' 
   },
-  { 
-    id: 'conductor', 
-    name: 'The Conductor 🚂', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg',
-    badge: '' 
-  },
 
-  // --- THE UPSELL COLLECTION (6 PREMIUM) ---
+  // --- PREMIUM TIER (The Upsell) ---
   { 
-    id: 'royal_wave', 
-    name: 'Royal Wave 👑', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/5_royal_wave.jpg',
+    id: 'north_pole_express', 
+    name: 'The Conductor 🚂', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/7_conductor.jpg',
     badge: 'PREMIUM' 
   },
   { 
-    id: 'north_pole', 
-    name: 'North Pole Express 🏔️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/8_north_pole_express.jpg',
+    id: 'disco_divas', 
+    name: 'Santa\'s Helpers 👯', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_disco_divas.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_disco_divas.jpg',
     badge: 'PREMIUM' 
   },
   { 
     id: 'sleigh_ride', 
     name: 'Sleigh Ride 🛷', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/9_sleigh_ride.jpg',
     badge: 'PREMIUM' 
   },
   { 
-    id: 'kitchen_chaos', 
-    name: 'Kitchen Chaos 🍳', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4',
-    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg',
-    badge: 'PREMIUM' 
-  },
-  { 
-    id: 'carolers', 
+    id: 'the_carolers', 
     name: 'The Carolers 🎶', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4',
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/11_carolers.jpg',
     badge: 'PREMIUM' 
   },
   { 
     id: 'angel_cloud', 
-    name: 'Angel Cloud ☁️', 
-    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4',
+    name: 'Cloud Angel 👼', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.mp4', 
     thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/12_cloud_angel.jpg',
+    badge: 'PREMIUM' 
+  },
+  { 
+    id: 'kitchen_chaos', 
+    name: 'Kitchen Chaos 🧑‍🍳', 
+    url: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.mp4', 
+    thumb: 'https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/10_kitchen_chaos.jpg',
     badge: 'PREMIUM' 
   }
 ];
