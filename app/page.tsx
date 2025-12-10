@@ -453,7 +453,7 @@ export default function Home() {
                     </div>
                     {/* Solid Light Grey Button (Clickable Look) */}
                     <a 
-                        href={`https://mygigglegram.lemonsqueezy.com/buy/VARIANT_ID_499?checkout[custom][device_id]=${deviceId}`}
+                        href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
                         className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
                     >
                         Get 10 Videos
@@ -485,7 +485,7 @@ export default function Home() {
 
                     {/* Primary Pulse Button */}
                     <a 
-                        href={`https://mygigglegram.lemonsqueezy.com/buy/VARIANT_ID_2999?checkout[custom][device_id]=${deviceId}`}
+                        href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`}
                         className="block w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform hover:scale-[1.02] active:scale-95"
                     >
                         Get Unlimited Magic
