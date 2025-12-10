@@ -414,17 +414,96 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 🎅 THE "SUPER GRANDMA" PRICING MODAL */}
       {showPaywall && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-emerald-200 relative overflow-hidden">
-             <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-            <div className="text-6xl mb-4">🎄</div>
-            <h3 className="text-2xl font-black text-gray-800 mb-2 leading-tight">{paywallReason === 'premium' ? 'Unlock Premium Magic!' : 'Unlock 10 More Videos!'}</h3>
-            <p className="text-gray-600 mb-8 font-medium">Get the Christmas Family Pack!<br/>Unlock everything for just $29.99.</p>
-            {/* ⚠️ REPLACE WITH YOUR REAL LINK */}
-            <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl text-xl font-black mb-4 shadow-lg shadow-emerald-200 transform transition-transform hover:scale-105 flex items-center justify-center gap-2"><span>Get Christmas Pass</span></a>
-            <div className="border-t border-gray-100 pt-4"><p className="text-gray-400 text-sm mb-1">Already have credits?</p><a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800">Log in to restore them</a></div>
-            <button onClick={() => setShowPaywall(false)} className="block mt-6 text-gray-400 text-sm hover:text-gray-600 underline mx-auto">Maybe later</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
+             
+             {/* Close Button */}
+             <button 
+                onClick={() => setShowPaywall(false)} 
+                className="absolute top-4 right-4 z-20 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"
+             >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+             </button>
+
+            {/* HEADER */}
+            <div className="text-center p-6 pb-2">
+                <div className="text-5xl mb-2">🎄</div>
+                <h3 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight">
+                    {paywallReason === 'premium' ? '🔒 Premium Magic!' : 'Woah! You loved that one?'}
+                </h3>
+                <p className="text-gray-500 mt-2">
+                    {paywallReason === 'premium' 
+                        ? "That scene is locked! Choose a pass to continue."
+                        : "You've used your free magic! Choose a pass to keep going."
+                    }
+                </p>
+            </div>
+
+            {/* PRICING CARDS CONTAINER */}
+            <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* CARD 1: THE SAFE SNACK (Anchor) */}
+                <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
+                    <div>
+                        <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
+                        <div className="text-3xl font-black text-gray-900 mt-2">$4.99</div>
+                        <p className="text-sm text-gray-500 mt-1">Perfect for a small family.</p>
+                    </div>
+                    {/* Solid Light Grey Button (Clickable Look) */}
+                    <a 
+                        href={`https://mygigglegram.lemonsqueezy.com/buy/VARIANT_ID_499?checkout[custom][device_id]=${deviceId}`}
+                        className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
+                    >
+                        Get 10 Videos
+                    </a>
+                </div>
+
+                {/* CARD 2: THE SUPER GRANDMA PASS (Target) */}
+                <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
+                    {/* Badge */}
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
+                        Best Value
+                    </div>
+
+                    <div>
+                        <h4 className="text-xl font-black text-emerald-900">🎅 "Super Grandma" Pass</h4>
+                        <div className="text-4xl font-black text-gray-900 mt-2">$29.99</div>
+                        <p className="text-xs font-bold text-emerald-700 bg-emerald-100 inline-block px-2 py-1 rounded-md mt-1 mb-3">
+                            ONE-TIME PAYMENT
+                        </p>
+                        
+                        {/* Nana Logic List */}
+                        <ul className="text-sm space-y-2 text-emerald-900 font-medium">
+                            <li className="flex items-center gap-2">✅ <b>Unlimited</b> Videos</li>
+                            <li className="flex items-center gap-2">✅ Cheaper than stamps!</li>
+                            <li className="flex items-center gap-2">✅ Send to everyone</li>
+                            <li className="flex items-center gap-2 text-gray-500">❌ <span className="font-bold text-gray-700">NO</span> Monthly Fees</li>
+                        </ul>
+                    </div>
+
+                    {/* Primary Pulse Button */}
+                    <a 
+                        href={`https://mygigglegram.lemonsqueezy.com/buy/VARIANT_ID_2999?checkout[custom][device_id]=${deviceId}`}
+                        className="block w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform hover:scale-[1.02] active:scale-95"
+                    >
+                        Get Unlimited Magic
+                    </a>
+                </div>
+
+            </div>
+
+            {/* FOOTER */}
+            <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
+                <a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800 text-sm">
+                    Already purchased? Restore Pass
+                </a>
+                <div className="mt-2 text-[10px] text-gray-400 flex items-center justify-center gap-1">
+                    <span>🔒</span> Secure Payment • Money-back Guarantee
+                </div>
+            </div>
+
           </div>
         </div>
       )}
