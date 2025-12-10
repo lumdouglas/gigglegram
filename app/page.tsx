@@ -25,6 +25,7 @@ export default function Home() {
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // ✅ NEW STATE
   
   // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
@@ -108,6 +109,7 @@ export default function Home() {
 
     const interval = setInterval(() => {
       msgIndex++;
+      // Stop at the last message, don't loop endlessly
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       }
@@ -240,9 +242,33 @@ export default function Home() {
     }
   };
 
-  const handleDownload = () => {
-      if (resultVideoUrl) {
-          window.open(resultVideoUrl, '_blank');
+  // ✅ NEW: FORCE DOWNLOAD LOGIC
+  const handleDownload = async () => {
+      if (!resultVideoUrl) return;
+      setIsDownloading(true);
+      try {
+        // 1. Fetch as blob
+        const response = await fetch(resultVideoUrl);
+        const blob = await response.blob();
+        
+        // 2. Create Object URL
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // 3. Force Click
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `GiggleGram-${Date.now()}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // 4. Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        console.error("Download failed", err);
+        alert("Saving failed. Try long-pressing the video to save!");
+      } finally {
+        setIsDownloading(false);
       }
   };
 
@@ -270,7 +296,7 @@ export default function Home() {
       </div>
 
       <div className="max-w-md mx-auto pt-8">
-        {/* ✏️ 2. HEADLINE COPY OVERHAUL */}
+        {/* 2. HEADLINE COPY OVERHAUL */}
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
         <p className="text-center text-gray-600 mb-8 text-lg font-medium">Choose a scene below to start! 👇</p>
 
@@ -292,7 +318,6 @@ export default function Home() {
                         }}
                         className={`flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${selectedTemplate.id === t.id ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' : 'border-transparent shadow-sm hover:scale-105 opacity-90'}`}
                     >
-                        {/* 🔒 3. VISUAL LOCK: Add slight grayscale/opacity to locked items */}
                         <img 
                             src={t.thumb} 
                             alt={t.name} 
@@ -334,7 +359,7 @@ export default function Home() {
 
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Photo deleted automatically.</span></div>
 
-          {/* 🛑 1. THE BUTTON TRAP */}
+          {/* 1. THE BUTTON TRAP */}
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading} 
@@ -343,7 +368,7 @@ export default function Home() {
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // DEAD STATE
                     : isLoading 
                         ? 'bg-pink-500 text-white cursor-wait animate-pulse' 
-                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer' // ACTIVE STATE (WhatsApp Green)
+                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer' // ACTIVE STATE
                 }`}
           >
              {isLoading ? (
@@ -364,13 +389,25 @@ export default function Home() {
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
               </div>
-              {/* PRIMARY BUTTON: The Money Maker (WhatsApp Green + Large) */}
+              {/* PRIMARY BUTTON */}
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95">
                 <span className="text-3xl">🚀</span>
                 {isSharing ? 'Opening WhatsApp...' : 'Send to Family Group'}
               </button>
-              {/* SECONDARY BUTTON */}
-              <button onClick={handleDownload} className="block w-full mt-4 text-gray-500 underline text-sm text-center hover:text-gray-700">⬇️ Save to my phone</button>
+              
+              {/* SECONDARY BUTTON: SAVING SPINNER */}
+              <button 
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="block w-full mt-4 text-gray-500 underline text-sm text-center hover:text-gray-700 disabled:opacity-50"
+              >
+                {isDownloading ? (
+                    <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin text-lg">⏳</span> Saving...
+                    </span>
+                ) : "⬇️ Save to my phone"}
+              </button>
+
               <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1"><span>🔒</span><span>Privacy Lock: We are deleting your photo right now.</span></div>
             </div>
           )}
@@ -384,6 +421,7 @@ export default function Home() {
             <div className="text-6xl mb-4">🎄</div>
             <h3 className="text-2xl font-black text-gray-800 mb-2 leading-tight">{paywallReason === 'premium' ? 'Unlock Premium Magic!' : 'Unlock 10 More Videos!'}</h3>
             <p className="text-gray-600 mb-8 font-medium">Get the Christmas Family Pack!<br/>Unlock everything for just $29.99.</p>
+            {/* ⚠️ REPLACE WITH YOUR REAL LINK */}
             <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl text-xl font-black mb-4 shadow-lg shadow-emerald-200 transform transition-transform hover:scale-105 flex items-center justify-center gap-2"><span>Get Christmas Pass</span></a>
             <div className="border-t border-gray-100 pt-4"><p className="text-gray-400 text-sm mb-1">Already have credits?</p><a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800">Log in to restore them</a></div>
             <button onClick={() => setShowPaywall(false)} className="block mt-6 text-gray-400 text-sm hover:text-gray-600 underline mx-auto">Maybe later</button>
