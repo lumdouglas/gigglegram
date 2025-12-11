@@ -18,8 +18,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // This redirects them back to the homepage after clicking the email link
-          // Redirect to our new callback route to finish the login
+          // ⚠️ CRITICAL: Must match the route we built in src/app/auth/callback/route.ts
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
@@ -40,9 +39,10 @@ export default function Login() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🎅</div>
-          <h1 className="text-2xl font-black text-gray-800 mb-2">Restore Your Pass</h1>
+          <h1 className="text-2xl font-black text-gray-800 mb-2">Restore Your Christmas Pass</h1>
           <p className="text-gray-500">
-            Enter the email you used at checkout. We'll send you a magic link to restore your credits!
+            Bought it on your phone? Use it on your iPad!<br/>
+            Enter your email to restore your purchase.
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export default function Login() {
                     placeholder="nana@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-4 rounded-xl border-2 border-gray-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-100 outline-none transition-all text-lg"
+                    className="w-full p-4 rounded-xl border-2 border-gray-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none transition-all text-lg"
                 />
             </div>
 
@@ -85,7 +85,7 @@ export default function Login() {
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-pink-500 hover:bg-pink-600 text-white font-black py-4 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-4 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
             >
                 {loading ? 'Sending...' : 'Send Magic Link ✨'}
             </button>

@@ -23,10 +23,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
-  // Removed old simple 'error' state, replaced with 'errorModal'
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
   // MONETIZATION STATE
@@ -191,7 +191,6 @@ export default function Home() {
       
       const startData = await startRes.json();
       
-      // Handle Paywall Trigger
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -200,17 +199,13 @@ export default function Home() {
           return;
       }
 
-      // Handle User Errors (400)
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
-      
-      // Handle Server Errors (500/504)
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       
       if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
       
       const predictionId = startData.id;
 
-      // POLLING LOOP
       while (true) {
         await new Promise(r => setTimeout(r, 3000));
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
@@ -230,7 +225,6 @@ export default function Home() {
             setIsLoading(false);
             break;
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            // Check for specific Replicate error text
             const errText = (checkData.error || '').toLowerCase();
             if (errText.includes('face') || errText.includes('detect')) {
                 throw { type: 'USER_ERROR' };
@@ -243,7 +237,6 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
-      // DEFAULT: Total Meltdown (500)
       let modalState = {
           title: "🍪 The elves are on a cookie break!",
           message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
@@ -255,7 +248,6 @@ export default function Home() {
       const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
 
-      // ERROR STATE A: USER ERROR (400)
       if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
           modalState = {
               title: "🎅 The elves are scratching their heads!",
@@ -264,12 +256,10 @@ export default function Home() {
               btnColor: "bg-teal-600 hover:bg-teal-700 text-white",
               action: () => { 
                   setErrorModal(null); 
-                  setSelectedFile(null); // Force them to re-select
+                  setSelectedFile(null); 
               }
           };
-      } 
-      // ERROR STATE B: SERVER HICCUP (504/Network)
-      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
+      } else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL') {
           modalState = {
               title: "❄️ Whoops! A snowflake got stuck in the gears.",
               message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
@@ -277,11 +267,10 @@ export default function Home() {
               btnColor: "bg-[#25D366] hover:bg-[#20BA5A] text-white",
               action: () => {
                   setErrorModal(null);
-                  handleSwap(); // Retry immediately
+                  handleSwap(); 
               }
           };
       }
-
       setErrorModal(modalState);
     }
   };
@@ -345,7 +334,6 @@ export default function Home() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
                 <h1 className="text-4xl mb-4">🚧</h1>
-                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
                 <input type="password" placeholder="Password" className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
                 <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
             </div>
@@ -447,7 +435,7 @@ export default function Home() {
              )}
           </button>
 
-          {/* NEW ERROR MODAL IMPLEMENTATION */}
+          {/* ERROR MODAL */}
           {errorModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
                 <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-gray-100">
@@ -495,6 +483,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* SUPER GRANDMA PRICING MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
@@ -521,6 +510,7 @@ export default function Home() {
 
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
+                {/* 10 VIDEOS (PINK BUTTON) */}
                 <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
@@ -535,6 +525,7 @@ export default function Home() {
                     </a>
                 </div>
 
+                {/* SUPER PASS (GREEN BUTTON) */}
                 <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
