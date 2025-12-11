@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import TEMPLATES from '@/config/templates.json'; 
 
-// 🎅 THE WAITING ROOM (Narrative Loader - 6s Intervals)
+// 🎅 THE WAITING ROOM (Narrative Loader - 8s Intervals)
 const LOADING_MESSAGES = [
   "Connecting to the North Pole... 📡❄️",
   "The elves are finding the magic dust... ✨",
@@ -68,7 +68,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (With Persistence Fix)
+  // 1. IDENTITY & PASS CHECK (Reinforced Persistence)
   useEffect(() => {
     if (isLocked) return;
 
@@ -80,8 +80,9 @@ export default function Home() {
       } catch (e) { console.warn("Fingerprint failed"); }
 
       const { data: { session } } = await supabase.auth.getSession();
+      
+      // Ensure Device ID Persistence
       let currentId = localStorage.getItem('giggle_device_id');
-
       if (!currentId) {
         currentId = uuidv4();
         localStorage.setItem('giggle_device_id', currentId!);
@@ -96,14 +97,14 @@ export default function Home() {
           setUserEmail(sessionUser.email);
       }
 
-      // Fetch User Permissions
+      // Fetch User Permissions from DB
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
       if (user) {
           if (user.christmas_pass) setHasChristmasPass(true);
           
-          // 🚨 CRITICAL FIX: Load Free Usage State from DB
+          // 🛑 FIX: Explicitly check DB for free usage status on load
           if (user.free_swap_used) {
               setFreeUsed(true);
           }
@@ -136,7 +137,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [isLocked]);
 
-  // 2. THE WAITING ROOM ANIMATION
+  // 2. THE WAITING ROOM ANIMATION (Updated to 8s)
   useEffect(() => {
     if (!isLoading) return;
     let msgIndex = 0;
@@ -147,7 +148,7 @@ export default function Home() {
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       }
-    }, 6000); 
+    }, 8000); 
 
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -169,7 +170,7 @@ export default function Home() {
         return;
     }
 
-    // 🛑 SOFT LOCK
+    // 🛑 SOFT LOCK CHECK
     if (!selectedTemplate.isPremium && freeUsed && !hasChristmasPass) {
         setPaywallReason('free_limit');
         setShowPaywall(true); 
@@ -205,9 +206,8 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
-          // Ensure DB reflects this immediately
+          // 🛡️ RE-SYNC DB to be safe
           await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
-          
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
@@ -228,7 +228,7 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // MARK AS USED IN DB IMMEDIATELY
+            // ✅ MARK AS USED IMMEDIATELY UPON SUCCESS
             if (!hasChristmasPass) {
                 setFreeUsed(true);
                 await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
@@ -393,7 +393,7 @@ export default function Home() {
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce shadow-sm">✨ Christmas VIP Pass Active</div>
         )}
 
-        {/* 🎁 GIFT STATUS BANNER (MOVED HERE) */}
+        {/* 🎁 GIFT STATUS BANNER */}
         {!hasChristmasPass && (
             <div className="w-full text-center py-4 mb-2">
                 {!freeUsed ? (
@@ -512,7 +512,8 @@ export default function Home() {
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800 leading-tight">✨ It Worked! Look at the magic! ✨</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
-                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                {/* 🚨 REMOVED 'muted' ATTRIBUTE FOR AUTOPLAY SOUND */}
+                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline className="w-full h-full object-cover" />
               </div>
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95">
                 <span className="text-3xl">🚀</span>
@@ -566,10 +567,10 @@ export default function Home() {
 
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* 10 VIDEOS (PINK BUTTON) */}
+                {/* 10 VIDEOS (PINK BUTTON) - UI FIXED */}
                 <a 
                     href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
-                    className="block border border-gray-200 shadow-sm rounded-2xl p-4 hover:border-rose-400 hover:shadow-md transition-all bg-white group cursor-pointer relative flex flex-col justify-between"
+                    className="block border-2 border-gray-200 shadow-sm rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white group cursor-pointer relative flex flex-col justify-between"
                 >
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
@@ -577,7 +578,7 @@ export default function Home() {
                         <p className="text-sm text-gray-500 mt-1">Perfect for a small family.</p>
                     </div>
                     
-                    <div className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95">
+                    <div className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-center mt-6 transition-transform">
                         Get 10 Videos
                     </div>
                 </a>
@@ -585,7 +586,7 @@ export default function Home() {
                 {/* SUPER PASS (GREEN BUTTON) */}
                 <a 
                     href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`}
-                    className="block border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10 hover:scale-[1.07] transition-all cursor-pointer"
+                    className="block border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10 active:scale-95 transition-all cursor-pointer"
                 >
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
@@ -606,7 +607,7 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    <div className="w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform active:scale-95">
+                    <div className="w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse">
                         Get Unlimited Magic
                     </div>
                 </a>
