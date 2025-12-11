@@ -68,7 +68,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (With Auth Listener)
+  // 1. IDENTITY & PASS CHECK (With Persistence Fix)
   useEffect(() => {
     if (isLocked) return;
 
@@ -102,7 +102,11 @@ export default function Home() {
 
       if (user) {
           if (user.christmas_pass) setHasChristmasPass(true);
-          if (user.free_swap_used) setFreeUsed(true);
+          
+          // 🚨 CRITICAL FIX: Load Free Usage State from DB
+          if (user.free_swap_used) {
+              setFreeUsed(true);
+          }
           
           // Link device_id if logged in
           if (sessionUser?.email && user.device_id) {
@@ -201,6 +205,9 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
+          // Ensure DB reflects this immediately
+          await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+          
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
@@ -221,6 +228,7 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
+            // MARK AS USED IN DB IMMEDIATELY
             if (!hasChristmasPass) {
                 setFreeUsed(true);
                 await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
@@ -258,7 +266,6 @@ export default function Home() {
       const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
 
-      // ERROR A: USER ERROR (400)
       if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
           modalState = {
               title: "🎅 The elves are scratching their heads!",
@@ -270,9 +277,7 @@ export default function Home() {
                   setSelectedFile(null); 
               }
           };
-      } 
-      // ERROR B: SERVER HICCUP (504/Network)
-      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
+      } else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
           modalState = {
               title: "❄️ Whoops! A snowflake got stuck in the gears.",
               message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
@@ -284,7 +289,6 @@ export default function Home() {
               }
           };
       }
-
       setErrorModal(modalState);
     }
   };
@@ -373,35 +377,11 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative">
       
-      {/* 🟢 HEADER: USER STATUS & GIFT PILL */}
       <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
-        {/* User Login Pill */}
         {userEmail ? (
-            <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100 backdrop-blur-sm">
-                👤 {userEmail.split('@')[0]}
-            </span>
+            <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100 backdrop-blur-sm">👤 {userEmail.split('@')[0]}</span>
         ) : (
-            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">
-                Log In
-            </a>
-        )}
-
-        {/* 🎁 GIFT STATUS PILL (Psychology Fix) */}
-        {!hasChristmasPass && (
-            <>
-                {!freeUsed ? (
-                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold border border-emerald-200 shadow-sm flex items-center gap-1 animate-pulse">
-                        🎁 1 Free Magic Gift
-                    </span>
-                ) : (
-                    <button 
-                        onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }}
-                        className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs font-bold border border-teal-200 shadow-sm animate-pulse hover:bg-teal-200 transition-colors flex items-center gap-1"
-                    >
-                        🔓 Unlock Unlimited
-                    </button>
-                )}
-            </>
+            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">Log In</a>
         )}
       </div>
 
@@ -411,6 +391,24 @@ export default function Home() {
 
         {hasChristmasPass && (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce shadow-sm">✨ Christmas VIP Pass Active</div>
+        )}
+
+        {/* 🎁 GIFT STATUS BANNER (MOVED HERE) */}
+        {!hasChristmasPass && (
+            <div className="w-full text-center py-4 mb-2">
+                {!freeUsed ? (
+                    <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm flex items-center justify-center gap-2 animate-pulse">
+                        🎁 1 Free Magic Gift
+                    </span>
+                ) : (
+                    <button 
+                        onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }}
+                        className="bg-rose-100 text-rose-800 text-lg font-bold px-6 py-2 rounded-full shadow-md animate-pulse border border-rose-200 hover:bg-rose-200 transition-colors flex items-center justify-center gap-2 mx-auto"
+                    >
+                        🔓 Unlock Unlimited Magic
+                    </button>
+                )}
+            </div>
         )}
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
