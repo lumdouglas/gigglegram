@@ -373,10 +373,10 @@ export default function Home() {
             disabled={!selectedFile || isLoading} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-2xl transition-all duration-300 transform
                 ${!selectedFile 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // DEAD STATE
                     : isLoading 
                         ? 'bg-pink-500 text-white cursor-wait animate-pulse' 
-                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer'
+                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer' // ACTIVE STATE
                 }`}
           >
              {isLoading ? (
@@ -425,7 +425,6 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
              
-             {/* Close Button */}
              <button 
                 onClick={() => setShowPaywall(false)} 
                 className="absolute top-4 right-4 z-20 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"
@@ -433,7 +432,6 @@ export default function Home() {
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
              </button>
 
-            {/* HEADER */}
             <div className="text-center p-6 pb-2">
                 <div className="text-5xl mb-2">🎄</div>
                 <h3 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight">
@@ -447,28 +445,26 @@ export default function Home() {
                 </p>
             </div>
 
-            {/* PRICING CARDS CONTAINER */}
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* CARD 1: THE SAFE SNACK (Anchor) */}
+                {/* CARD 1: THE SAFE SNACK (Pink "Bonbon" Style) */}
                 <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
                         <div className="text-3xl font-black text-gray-900 mt-2">$4.99</div>
                         <p className="text-sm text-gray-500 mt-1">Perfect for a small family.</p>
                     </div>
-                    {/* Solid Light Grey Button (Clickable Look) */}
+                    {/* UPDATED PINK BUTTON */}
                     <a 
                         href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
-                        className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
+                        className="block w-full bg-pink-200 hover:bg-pink-300 text-pink-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
                     >
                         Get 10 Videos
                     </a>
                 </div>
 
-                {/* CARD 2: THE SUPER GRANDMA PASS (Target) */}
+                {/* CARD 2: THE SUPER GRANDMA PASS (Green Pulse) */}
                 <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
-                    {/* Badge */}
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
                     </div>
@@ -480,7 +476,6 @@ export default function Home() {
                             ONE-TIME PAYMENT
                         </p>
                         
-                        {/* Nana Logic List */}
                         <ul className="text-sm space-y-2 text-emerald-900 font-medium">
                             <li className="flex items-center gap-2">✅ <b>Unlimited</b> Videos</li>
                             <li className="flex items-center gap-2">✅ Cheaper than stamps!</li>
@@ -489,7 +484,6 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    {/* Primary Pulse Button */}
                     <a 
                         href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`}
                         className="block w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform hover:scale-[1.02] active:scale-95"
@@ -500,7 +494,6 @@ export default function Home() {
 
             </div>
 
-            {/* FOOTER */}
             <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
                 <a href="/login" className="text-teal-600 font-bold underline hover:text-teal-800 text-sm">
                     Already purchased? Restore Pass
