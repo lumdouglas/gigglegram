@@ -3,74 +3,101 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function LoginPage() {
+export default function Login() {
   const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setMessage('');
+    setLoading(true);
+    setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // This redirects them back to the homepage after clicking the email link
+          // Redirect to our new callback route to finish the login
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
 
-    setIsLoading(false);
-
-    if (error) {
-      setMessage('❌ ' + error.message);
-    } else {
-      setMessage('✅ Check your email! Click the magic link to log in.');
+      if (error) throw error;
+      setSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Try again!');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-red-50 to-green-50 flex items-center justify-center">
-      <div className="max-w-md w-full">
-        <h1 className="text-5xl font-bold text-center mb-2">
-          🎄 GiggleGram
-        </h1>
-        <p className="text-center text-gray-600 mb-8 text-lg">
-          Log in to start swapping! ✨
-        </p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-pink-50 to-white p-6">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border-2 border-pink-100">
+        
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-4">🎅</div>
+          <h1 className="text-2xl font-black text-gray-800 mb-2">Restore Your Pass</h1>
+          <p className="text-gray-500">
+            Enter the email you used at checkout. We'll send you a magic link to restore your credits!
+          </p>
+        </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleLogin}>
-            <label className="block mb-4">
-              <span className="text-lg font-semibold mb-2 block">
-                📧 Your Email
-              </span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="grandma@example.com"
-                required
-                className="w-full text-lg p-4 border-2 border-gray-300 rounded-lg"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl text-2xl font-bold disabled:bg-gray-300 transition-colors"
+        {sent ? (
+          // Success State
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center animate-in fade-in zoom-in">
+            <div className="text-4xl mb-3">📧</div>
+            <h3 className="text-xl font-bold text-emerald-800 mb-2">Check your email!</h3>
+            <p className="text-emerald-600 mb-4">
+              We sent a magic link to <b>{email}</b>. Click it to log in instantly.
+            </p>
+            <button 
+                onClick={() => setSent(false)}
+                className="text-sm text-gray-400 underline hover:text-gray-600"
             >
-              {isLoading ? '📬 Sending Magic Link...' : '✨ Send Magic Link'}
+                Try a different email
+            </button>
+          </div>
+        ) : (
+          // Login Form
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Email Address</label>
+                <input 
+                    type="email" 
+                    required
+                    placeholder="nana@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full p-4 rounded-xl border-2 border-gray-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-100 outline-none transition-all text-lg"
+                />
+            </div>
+
+            {error && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold">
+                    {error}
+                </div>
+            )}
+
+            <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white font-black py-4 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+                {loading ? 'Sending...' : 'Send Magic Link ✨'}
             </button>
           </form>
+        )}
 
-          {message && (
-            <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
-              <p className="text-blue-800 text-lg text-center">{message}</p>
-            </div>
-          )}
+        {/* Back Link */}
+        <div className="mt-8 text-center">
+            <a href="/" className="text-gray-400 font-bold hover:text-gray-600">← Back to Magic</a>
         </div>
+
       </div>
-    </main>
+    </div>
   );
 }
