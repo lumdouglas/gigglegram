@@ -68,7 +68,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK
+  // 1. IDENTITY & PASS CHECK (With Auth Listener)
   useEffect(() => {
     if (isLocked) return;
 
@@ -88,6 +88,7 @@ export default function Home() {
       }
       setDeviceId(currentId);
 
+      // Determine lookup key
       const lookupId = sessionUser?.email || currentId;
       const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
@@ -95,6 +96,7 @@ export default function Home() {
           setUserEmail(sessionUser.email);
       }
 
+      // Fetch User Permissions
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
@@ -102,21 +104,25 @@ export default function Home() {
           if (user.christmas_pass) setHasChristmasPass(true);
           if (user.free_swap_used) setFreeUsed(true);
           
+          // Link device_id if logged in
           if (sessionUser?.email && user.device_id) {
               setDeviceId(user.device_id);
               localStorage.setItem('giggle_device_id', user.device_id);
           }
       } else {
+          // Initialize Guest
           if (!sessionUser?.email) {
             await supabase.from('users').insert([{ device_id: currentId }]);
           }
       }
     };
 
+    // Initial Check
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
+    // Listen for Magic Link Login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
             checkUser(session.user);
@@ -191,6 +197,7 @@ export default function Home() {
       
       const startData = await startRes.json();
       
+      // Handle Paywall Trigger (402 Payment Required)
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -199,6 +206,7 @@ export default function Home() {
           return;
       }
 
+      // 🚨 ERROR STATE MAPPING
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       if (startRes.status === 429) throw { type: 'MELTDOWN' };
@@ -238,6 +246,7 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
+      // DEFAULT: ERROR C (Total Meltdown / 500 / 429)
       let modalState = {
           title: "🍪 The elves are on a cookie break!",
           message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
@@ -249,6 +258,7 @@ export default function Home() {
       const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
 
+      // ERROR A: USER ERROR (400)
       if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
           modalState = {
               title: "🎅 The elves are scratching their heads!",
@@ -260,7 +270,9 @@ export default function Home() {
                   setSelectedFile(null); 
               }
           };
-      } else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
+      } 
+      // ERROR B: SERVER HICCUP (504/Network)
+      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
           modalState = {
               title: "❄️ Whoops! A snowflake got stuck in the gears.",
               message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
@@ -272,6 +284,7 @@ export default function Home() {
               }
           };
       }
+
       setErrorModal(modalState);
     }
   };
@@ -428,7 +441,6 @@ export default function Home() {
              </label>
           </div>
 
-          {/* UPLOAD SCREEN TRUST FOOTER (Compliance Update) */}
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2">
             <span>🔒</span>
             <span>Powered by AI Magic. Photo deleted immediately.</span>
@@ -497,7 +509,6 @@ export default function Home() {
                 ) : "⬇️ Save to my phone"}
               </button>
 
-              {/* SUCCESS SCREEN TRUST FOOTER (Compliance Update) */}
               <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1">
                 <span>🔒</span>
                 <span>Powered by AI Magic. Photo deleted immediately.</span>
@@ -533,21 +544,27 @@ export default function Home() {
 
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
+                {/* 10 VIDEOS (PINK BUTTON) */}
+                <a 
+                    href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
+                    className="block border border-gray-200 shadow-sm rounded-2xl p-4 hover:border-rose-400 hover:shadow-md transition-all bg-white group cursor-pointer relative flex flex-col justify-between"
+                >
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
                         <div className="text-3xl font-black text-gray-900 mt-2">$4.99</div>
                         <p className="text-sm text-gray-500 mt-1">Perfect for a small family.</p>
                     </div>
-                    <a 
-                        href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
-                        className="block w-full bg-pink-200 hover:bg-pink-300 text-pink-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
-                    >
+                    
+                    <div className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95">
                         Get 10 Videos
-                    </a>
-                </div>
+                    </div>
+                </a>
 
-                <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
+                {/* SUPER PASS (GREEN BUTTON) */}
+                <a 
+                    href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`}
+                    className="block border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10 hover:scale-[1.07] transition-all cursor-pointer"
+                >
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
                     </div>
@@ -567,13 +584,10 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    <a 
-                        href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`}
-                        className="block w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform hover:scale-[1.02] active:scale-95"
-                    >
+                    <div className="w-full bg-[#25D366] hover:bg-[#20BA5A] text-white font-black py-4 rounded-xl text-center mt-6 shadow-xl animate-pulse hover:animate-none transition-transform active:scale-95">
                         Get Unlimited Magic
-                    </a>
-                </div>
+                    </div>
+                </a>
 
             </div>
 
