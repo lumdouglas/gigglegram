@@ -373,11 +373,35 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative">
       
-      <div className="absolute top-4 right-4 z-10">
+      {/* 🟢 HEADER: USER STATUS & GIFT PILL */}
+      <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
+        {/* User Login Pill */}
         {userEmail ? (
-            <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100 backdrop-blur-sm">👤 {userEmail.split('@')[0]}</span>
+            <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100 backdrop-blur-sm">
+                👤 {userEmail.split('@')[0]}
+            </span>
         ) : (
-            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">Log In</a>
+            <a href="/login" className="text-sm font-bold text-teal-700 hover:text-teal-900 underline decoration-2 decoration-pink-300">
+                Log In
+            </a>
+        )}
+
+        {/* 🎁 GIFT STATUS PILL (Psychology Fix) */}
+        {!hasChristmasPass && (
+            <>
+                {!freeUsed ? (
+                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold border border-emerald-200 shadow-sm flex items-center gap-1 animate-pulse">
+                        🎁 1 Free Magic Gift
+                    </span>
+                ) : (
+                    <button 
+                        onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }}
+                        className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs font-bold border border-teal-200 shadow-sm animate-pulse hover:bg-teal-200 transition-colors flex items-center gap-1"
+                    >
+                        🔓 Unlock Unlimited
+                    </button>
+                )}
+            </>
         )}
       </div>
 
