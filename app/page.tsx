@@ -68,7 +68,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (With Auth Listener)
+  // 1. IDENTITY & PASS CHECK
   useEffect(() => {
     if (isLocked) return;
 
@@ -88,7 +88,6 @@ export default function Home() {
       }
       setDeviceId(currentId);
 
-      // Determine lookup key
       const lookupId = sessionUser?.email || currentId;
       const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
@@ -96,7 +95,6 @@ export default function Home() {
           setUserEmail(sessionUser.email);
       }
 
-      // Fetch User Permissions
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
@@ -104,25 +102,21 @@ export default function Home() {
           if (user.christmas_pass) setHasChristmasPass(true);
           if (user.free_swap_used) setFreeUsed(true);
           
-          // Link device_id if logged in
           if (sessionUser?.email && user.device_id) {
               setDeviceId(user.device_id);
               localStorage.setItem('giggle_device_id', user.device_id);
           }
       } else {
-          // Initialize Guest
           if (!sessionUser?.email) {
             await supabase.from('users').insert([{ device_id: currentId }]);
           }
       }
     };
 
-    // Initial Check
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
-    // Listen for Magic Link Login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
             checkUser(session.user);
@@ -197,7 +191,6 @@ export default function Home() {
       
       const startData = await startRes.json();
       
-      // Handle Paywall Trigger (402 Payment Required)
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -206,7 +199,6 @@ export default function Home() {
           return;
       }
 
-      // 🚨 ERROR STATE MAPPING
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       if (startRes.status === 429) throw { type: 'MELTDOWN' };
@@ -246,7 +238,6 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
-      // DEFAULT: ERROR C (Total Meltdown / 500 / 429)
       let modalState = {
           title: "🍪 The elves are on a cookie break!",
           message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
@@ -258,7 +249,6 @@ export default function Home() {
       const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
 
-      // ERROR A: USER ERROR (400)
       if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
           modalState = {
               title: "🎅 The elves are scratching their heads!",
@@ -270,9 +260,7 @@ export default function Home() {
                   setSelectedFile(null); 
               }
           };
-      } 
-      // ERROR B: SERVER HICCUP (504/Network)
-      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
+      } else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
           modalState = {
               title: "❄️ Whoops! A snowflake got stuck in the gears.",
               message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
@@ -284,7 +272,6 @@ export default function Home() {
               }
           };
       }
-
       setErrorModal(modalState);
     }
   };
@@ -293,24 +280,15 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
-    // 📊 TRACKING (Fixed: Fire-and-Forget without .catch)
+    // 📊 TRACKING (Safe Fallback)
     if (deviceId) {
-        // We use .then() to handle the result or error safely
         supabase.rpc('increment_shares', { row_device_id: deviceId })
             .then(({ error }) => {
                 if (error) {
-                    // If RPC fails (e.g. function doesn't exist), fallback to direct update
-                    console.warn("RPC missing, using fallback update");
-                    supabase.from('users')
-                        .select('shares_count')
-                        .eq('device_id', deviceId)
-                        .single()
+                    supabase.from('users').select('shares_count').eq('device_id', deviceId).single()
                         .then(({ data }) => {
                             const current = data?.shares_count || 0;
-                            supabase.from('users')
-                                .update({ shares_count: current + 1 })
-                                .eq('device_id', deviceId)
-                                .then(() => {});
+                            supabase.from('users').update({ shares_count: current + 1 }).eq('device_id', deviceId).then(() => {});
                         });
                 }
             });
@@ -450,7 +428,11 @@ export default function Home() {
              </label>
           </div>
 
-          <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Photo deleted automatically.</span></div>
+          {/* UPLOAD SCREEN TRUST FOOTER (Compliance Update) */}
+          <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2">
+            <span>🔒</span>
+            <span>Powered by AI Magic. Photo deleted immediately.</span>
+          </div>
 
           <button 
             onClick={handleSwap} 
@@ -515,7 +497,11 @@ export default function Home() {
                 ) : "⬇️ Save to my phone"}
               </button>
 
-              <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1"><span>🔒</span><span>Privacy Lock: We are deleting your photo right now.</span></div>
+              {/* SUCCESS SCREEN TRUST FOOTER (Compliance Update) */}
+              <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1">
+                <span>🔒</span>
+                <span>Powered by AI Magic. Photo deleted immediately.</span>
+              </div>
             </div>
           )}
         </div>
@@ -547,7 +533,6 @@ export default function Home() {
 
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* 10 VIDEOS (PINK BUTTON) */}
                 <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
@@ -562,7 +547,6 @@ export default function Home() {
                     </a>
                 </div>
 
-                {/* SUPER PASS (GREEN BUTTON) */}
                 <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
