@@ -191,6 +191,7 @@ export default function Home() {
       
       const startData = await startRes.json();
       
+      // Handle Paywall Trigger (402 Payment Required)
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -199,9 +200,16 @@ export default function Home() {
           return;
       }
 
+      // 🚨 ERROR STATE MAPPING
+      // ERROR A: User Error (400)
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
+      
+      // ERROR B: Server Hiccup (504, 500)
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       
+      // ERROR C: Meltdown / Rate Limit (429)
+      if (startRes.status === 429) throw { type: 'MELTDOWN' };
+
       if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
       
       const predictionId = startData.id;
@@ -225,6 +233,7 @@ export default function Home() {
             setIsLoading(false);
             break;
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+            // Check for specific Replicate error text
             const errText = (checkData.error || '').toLowerCase();
             if (errText.includes('face') || errText.includes('detect')) {
                 throw { type: 'USER_ERROR' };
@@ -237,6 +246,7 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
+      // DEFAULT: ERROR C (Total Meltdown / 500 / 429)
       let modalState = {
           title: "🍪 The elves are on a cookie break!",
           message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
@@ -248,6 +258,7 @@ export default function Home() {
       const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
 
+      // ERROR A: USER ERROR (400)
       if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
           modalState = {
               title: "🎅 The elves are scratching their heads!",
@@ -256,10 +267,12 @@ export default function Home() {
               btnColor: "bg-teal-600 hover:bg-teal-700 text-white",
               action: () => { 
                   setErrorModal(null); 
-                  setSelectedFile(null); 
+                  setSelectedFile(null); // Force them to re-select
               }
           };
-      } else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL') {
+      } 
+      // ERROR B: SERVER HICCUP (504/Network)
+      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
           modalState = {
               title: "❄️ Whoops! A snowflake got stuck in the gears.",
               message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
@@ -267,10 +280,11 @@ export default function Home() {
               btnColor: "bg-[#25D366] hover:bg-[#20BA5A] text-white",
               action: () => {
                   setErrorModal(null);
-                  handleSwap(); 
+                  handleSwap(); // Retry immediately
               }
           };
       }
+
       setErrorModal(modalState);
     }
   };
@@ -334,6 +348,7 @@ export default function Home() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
                 <h1 className="text-4xl mb-4">🚧</h1>
+                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
                 <input type="password" placeholder="Password" className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
                 <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
             </div>
@@ -362,6 +377,7 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           
+          {/* TEMPLATE SELECTOR */}
           <div className="mb-6">
             <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
                 {TEMPLATES.map((t) => (
