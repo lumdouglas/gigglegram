@@ -68,7 +68,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK
+  // 1. IDENTITY & PASS CHECK (With Auth Listener)
   useEffect(() => {
     if (isLocked) return;
 
@@ -88,6 +88,7 @@ export default function Home() {
       }
       setDeviceId(currentId);
 
+      // Determine lookup key
       const lookupId = sessionUser?.email || currentId;
       const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
@@ -95,6 +96,7 @@ export default function Home() {
           setUserEmail(sessionUser.email);
       }
 
+      // Fetch User Permissions
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
@@ -102,21 +104,25 @@ export default function Home() {
           if (user.christmas_pass) setHasChristmasPass(true);
           if (user.free_swap_used) setFreeUsed(true);
           
+          // Link device_id if logged in
           if (sessionUser?.email && user.device_id) {
               setDeviceId(user.device_id);
               localStorage.setItem('giggle_device_id', user.device_id);
           }
       } else {
+          // Initialize Guest
           if (!sessionUser?.email) {
             await supabase.from('users').insert([{ device_id: currentId }]);
           }
       }
     };
 
+    // Initial Check
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
+    // Listen for Magic Link Login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
             checkUser(session.user);
@@ -201,13 +207,8 @@ export default function Home() {
       }
 
       // 🚨 ERROR STATE MAPPING
-      // ERROR A: User Error (400)
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
-      
-      // ERROR B: Server Hiccup (504, 500)
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
-      
-      // ERROR C: Meltdown / Rate Limit (429)
       if (startRes.status === 429) throw { type: 'MELTDOWN' };
 
       if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
@@ -233,7 +234,6 @@ export default function Home() {
             setIsLoading(false);
             break;
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            // Check for specific Replicate error text
             const errText = (checkData.error || '').toLowerCase();
             if (errText.includes('face') || errText.includes('detect')) {
                 throw { type: 'USER_ERROR' };
@@ -267,7 +267,7 @@ export default function Home() {
               btnColor: "bg-teal-600 hover:bg-teal-700 text-white",
               action: () => { 
                   setErrorModal(null); 
-                  setSelectedFile(null); // Force them to re-select
+                  setSelectedFile(null); 
               }
           };
       } 
@@ -280,7 +280,7 @@ export default function Home() {
               btnColor: "bg-[#25D366] hover:bg-[#20BA5A] text-white",
               action: () => {
                   setErrorModal(null);
-                  handleSwap(); // Retry immediately
+                  handleSwap(); 
               }
           };
       }
@@ -293,6 +293,29 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
+    // 📊 TRACKING (Fixed: Fire-and-Forget without .catch)
+    if (deviceId) {
+        // We use .then() to handle the result or error safely
+        supabase.rpc('increment_shares', { row_device_id: deviceId })
+            .then(({ error }) => {
+                if (error) {
+                    // If RPC fails (e.g. function doesn't exist), fallback to direct update
+                    console.warn("RPC missing, using fallback update");
+                    supabase.from('users')
+                        .select('shares_count')
+                        .eq('device_id', deviceId)
+                        .single()
+                        .then(({ data }) => {
+                            const current = data?.shares_count || 0;
+                            supabase.from('users')
+                                .update({ shares_count: current + 1 })
+                                .eq('device_id', deviceId)
+                                .then(() => {});
+                        });
+                }
+            });
+    }
+
     const babyName = "my grandbaby"; 
     const shareText = `I made a little magic with ${babyName}'s photo! ✨👶\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it yourself at MyGiggleGram.com`;
 
@@ -377,7 +400,6 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           
-          {/* TEMPLATE SELECTOR */}
           <div className="mb-6">
             <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
                 {TEMPLATES.map((t) => (
@@ -499,7 +521,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* SUPER GRANDMA PRICING MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
