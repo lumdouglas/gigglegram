@@ -218,8 +218,7 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
-          localStorage.setItem('giggle_free_used', 'true'); // Persist rejection
-          
+          localStorage.setItem('giggle_free_used', 'true'); 
           await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
@@ -309,6 +308,7 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
+    // 📊 TRACKING
     if (deviceId) {
         supabase.rpc('increment_shares', { row_device_id: deviceId })
             .then(({ error }) => {
@@ -527,7 +527,7 @@ export default function Home() {
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800 leading-tight">✨ It Worked! Look at the magic! ✨</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
-                {/* 🚨 AUTOPLAY WITH SOUND (No Mute) */}
+                {/* 🚨 AUTOPLAY WITH SOUND */}
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline className="w-full h-full object-cover" />
               </div>
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95">
@@ -547,9 +547,15 @@ export default function Home() {
                 ) : "⬇️ Save to my phone"}
               </button>
 
-              <div className="mt-6 text-xs text-gray-400 flex items-center justify-center gap-1">
-                <span>🔒</span>
-                <span>Powered by AI Magic. Photo deleted immediately.</span>
+              {/* RETENTION WARNING BOX (THE NANA PIVOT) */}
+              <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 text-center shadow-sm">
+                <p className="text-sm text-amber-900 font-bold mb-1">
+                    ⚠️ Don't lose your magic!
+                </p>
+                <p className="text-xs text-amber-800 leading-snug">
+                    To protect your privacy, we do not keep a copy. <br/>
+                    <strong className="font-black">Send it to your family now to save it forever!</strong>
+                </p>
               </div>
             </div>
           )}
