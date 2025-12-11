@@ -71,13 +71,12 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (Now with Gatekeeper Logic)
+  // 1. IDENTITY & PASS CHECK (Now with LocalStorage Fallback)
   useEffect(() => {
     if (isLocked) return;
 
     const checkUser = async (sessionUser: any = null) => {
       try {
-        // Fingerprinting
         try {
             const fp = await FingerprintJS.load();
             const result = await fp.get();
@@ -86,7 +85,6 @@ export default function Home() {
 
         const { data: { session } } = await supabase.auth.getSession();
         
-        // Device ID Persistence
         let currentId = localStorage.getItem('giggle_device_id');
         if (!currentId) {
             currentId = uuidv4();
@@ -94,7 +92,12 @@ export default function Home() {
         }
         setDeviceId(currentId);
 
-        // Determine lookup key
+        // 🛑 CRITICAL: Check Local Cache First (Instant Lock)
+        const localFreeUsed = localStorage.getItem('giggle_free_used');
+        if (localFreeUsed === 'true') {
+            setFreeUsed(true);
+        }
+
         const lookupId = sessionUser?.email || currentId;
         const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
@@ -102,16 +105,18 @@ export default function Home() {
             setUserEmail(sessionUser.email);
         }
 
-        // Fetch User Permissions from DB
         const { data: user } = await supabase
             .from('users').select('*').eq(lookupCol, lookupId!).single();
 
         if (user) {
-            if (user.christmas_pass) setHasChristmasPass(true);
-            
-            // 🛑 CRITICAL FIX: Sync DB State to Local State
-            if (user.free_swap_used) {
+            if (user.christmas_pass) {
+                setHasChristmasPass(true);
+                // Pass overrides free usage
+                setFreeUsed(false); 
+            } else if (user.free_swap_used) {
                 setFreeUsed(true);
+                // Ensure local cache matches DB
+                localStorage.setItem('giggle_free_used', 'true');
             }
             
             if (sessionUser?.email && user.device_id) {
@@ -119,7 +124,6 @@ export default function Home() {
                 localStorage.setItem('giggle_device_id', user.device_id);
             }
         } else {
-            // New Guest - Create Record
             if (!sessionUser?.email) {
                 await supabase.from('users').insert([{ device_id: currentId }]);
             }
@@ -127,19 +131,16 @@ export default function Home() {
       } catch (err) {
           console.error("Init Error:", err);
       } finally {
-          // 🔓 OPEN THE GATE: Only now is the UI allowed to render interactivity
           setIsInitializing(false);
       }
     };
 
-    // Run Logic
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
-            // Re-lock gate briefly while we switch users
             setIsInitializing(true);
             checkUser(session.user);
         }
@@ -148,7 +149,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [isLocked]);
 
-  // 2. THE WAITING ROOM ANIMATION (8s)
+  // 2. THE WAITING ROOM ANIMATION
   useEffect(() => {
     if (!isLoading) return;
     let msgIndex = 0;
@@ -217,7 +218,8 @@ export default function Home() {
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
-          // Re-affirm DB state
+          localStorage.setItem('giggle_free_used', 'true'); // Persist rejection
+          
           await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
@@ -241,6 +243,7 @@ export default function Home() {
             // ✅ MARK AS USED IMMEDIATELY
             if (!hasChristmasPass) {
                 setFreeUsed(true);
+                localStorage.setItem('giggle_free_used', 'true'); // 🛑 LOCAL LOCK
                 await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
             }
 
@@ -482,7 +485,6 @@ export default function Home() {
 
           <button 
             onClick={handleSwap} 
-            // 🛑 BUTTON GATEKEEPER: Disabled if Initializing
             disabled={!selectedFile || isLoading || isInitializing} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-2xl transition-all duration-300 transform
                 ${(!selectedFile || isInitializing)
