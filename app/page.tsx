@@ -60,45 +60,75 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK
+// 1. IDENTITY & PASS CHECK
   useEffect(() => {
     if (isLocked) return;
 
-    const initUser = async () => {
+    // Define the check logic
+    const checkUser = async (sessionUser: any = null) => {
       try {
+        // 1. Setup Fingerprint
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         setFingerprint(result.visitorId);
-      } catch (e) {
-        console.warn("Fingerprint failed");
-      }
+      } catch (e) { console.warn("Fingerprint failed"); }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      // 2. Setup Device ID
       let currentId = localStorage.getItem('giggle_device_id');
-
       if (!currentId) {
         currentId = uuidv4();
         localStorage.setItem('giggle_device_id', currentId!);
       }
       setDeviceId(currentId);
 
-      const lookupId = session?.user?.email ? session.user.email : currentId;
-      const lookupCol = session?.user?.email ? 'email' : 'device_id';
+      // 3. Determine who we are looking for
+      // If we have a sessionUser (from listener), use email. Otherwise use deviceId.
+      const lookupId = sessionUser?.email || currentId;
+      const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
+      // 4. Update UI if logged in
+      if (sessionUser?.email) {
+          setUserEmail(sessionUser.email);
+      }
+
+      // 5. Fetch Database Permissions
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
       if (user) {
-          setHasChristmasPass(user.christmas_pass || false);
-          setFreeUsed(user.free_swap_used || false);
-          if (session?.user?.email) setUserEmail(session.user.email);
+          // If they have a pass, UNLOCK EVERYTHING
+          if (user.christmas_pass) setHasChristmasPass(true);
+          
+          // Sync free usage status
+          if (user.free_swap_used) setFreeUsed(true);
+          
+          // If we just logged in, update the local device_id to match the account
+          if (sessionUser?.email && user.device_id) {
+              setDeviceId(user.device_id);
+              localStorage.setItem('giggle_device_id', user.device_id);
+          }
       } else {
-          if (!session?.user?.email) {
+          // New Guest
+          if (!sessionUser?.email) {
             await supabase.from('users').insert([{ device_id: currentId }]);
           }
       }
     };
-    initUser();
+
+    // Run once on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        checkUser(session?.user);
+    });
+
+    // LISTEN for Magic Link logins (The Fix)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+            console.log("⚡ Auth Event: User Logged In", session.user.email);
+            checkUser(session.user);
+        }
+    });
+
+    return () => subscription.unsubscribe();
   }, [isLocked]);
 
   // 2. THE WAITING ROOM ANIMATION (Strict 6s Interval)
