@@ -26,6 +26,9 @@ export default function Home() {
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // 🔒 THE GATEKEEPER: Prevents "Refresh Exploit"
+  const [isInitializing, setIsInitializing] = useState(true);
+
   // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
@@ -68,68 +71,76 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (Reinforced Persistence)
+  // 1. IDENTITY & PASS CHECK (Now with Gatekeeper Logic)
   useEffect(() => {
     if (isLocked) return;
 
     const checkUser = async (sessionUser: any = null) => {
       try {
-        const fp = await FingerprintJS.load();
-        const result = await fp.get();
-        setFingerprint(result.visitorId);
-      } catch (e) { console.warn("Fingerprint failed"); }
+        // Fingerprinting
+        try {
+            const fp = await FingerprintJS.load();
+            const result = await fp.get();
+            setFingerprint(result.visitorId);
+        } catch (e) { console.warn("Fingerprint failed"); }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Ensure Device ID Persistence
-      let currentId = localStorage.getItem('giggle_device_id');
-      if (!currentId) {
-        currentId = uuidv4();
-        localStorage.setItem('giggle_device_id', currentId!);
-      }
-      setDeviceId(currentId);
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Device ID Persistence
+        let currentId = localStorage.getItem('giggle_device_id');
+        if (!currentId) {
+            currentId = uuidv4();
+            localStorage.setItem('giggle_device_id', currentId!);
+        }
+        setDeviceId(currentId);
 
-      // Determine lookup key
-      const lookupId = sessionUser?.email || currentId;
-      const lookupCol = sessionUser?.email ? 'email' : 'device_id';
+        // Determine lookup key
+        const lookupId = sessionUser?.email || currentId;
+        const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
-      if (sessionUser?.email) {
-          setUserEmail(sessionUser.email);
-      }
+        if (sessionUser?.email) {
+            setUserEmail(sessionUser.email);
+        }
 
-      // Fetch User Permissions from DB
-      const { data: user } = await supabase
-          .from('users').select('*').eq(lookupCol, lookupId!).single();
+        // Fetch User Permissions from DB
+        const { data: user } = await supabase
+            .from('users').select('*').eq(lookupCol, lookupId!).single();
 
-      if (user) {
-          if (user.christmas_pass) setHasChristmasPass(true);
-          
-          // 🛑 FIX: Explicitly check DB for free usage status on load
-          if (user.free_swap_used) {
-              setFreeUsed(true);
-          }
-          
-          // Link device_id if logged in
-          if (sessionUser?.email && user.device_id) {
-              setDeviceId(user.device_id);
-              localStorage.setItem('giggle_device_id', user.device_id);
-          }
-      } else {
-          // Initialize Guest
-          if (!sessionUser?.email) {
-            await supabase.from('users').insert([{ device_id: currentId }]);
-          }
+        if (user) {
+            if (user.christmas_pass) setHasChristmasPass(true);
+            
+            // 🛑 CRITICAL FIX: Sync DB State to Local State
+            if (user.free_swap_used) {
+                setFreeUsed(true);
+            }
+            
+            if (sessionUser?.email && user.device_id) {
+                setDeviceId(user.device_id);
+                localStorage.setItem('giggle_device_id', user.device_id);
+            }
+        } else {
+            // New Guest - Create Record
+            if (!sessionUser?.email) {
+                await supabase.from('users').insert([{ device_id: currentId }]);
+            }
+        }
+      } catch (err) {
+          console.error("Init Error:", err);
+      } finally {
+          // 🔓 OPEN THE GATE: Only now is the UI allowed to render interactivity
+          setIsInitializing(false);
       }
     };
 
-    // Initial Check
+    // Run Logic
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
-    // Listen for Magic Link Login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
+            // Re-lock gate briefly while we switch users
+            setIsInitializing(true);
             checkUser(session.user);
         }
     });
@@ -137,7 +148,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [isLocked]);
 
-  // 2. THE WAITING ROOM ANIMATION (Updated to 8s)
+  // 2. THE WAITING ROOM ANIMATION (8s)
   useEffect(() => {
     if (!isLoading) return;
     let msgIndex = 0;
@@ -202,18 +213,17 @@ export default function Home() {
       
       const startData = await startRes.json();
       
-      // Handle Paywall Trigger (402 Payment Required)
+      // Handle Paywall Trigger
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
-          // 🛡️ RE-SYNC DB to be safe
+          // Re-affirm DB state
           await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
       }
 
-      // 🚨 ERROR STATE MAPPING
       if (startRes.status === 400) throw { type: 'USER_ERROR' };
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       if (startRes.status === 429) throw { type: 'MELTDOWN' };
@@ -228,7 +238,7 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // ✅ MARK AS USED IMMEDIATELY UPON SUCCESS
+            // ✅ MARK AS USED IMMEDIATELY
             if (!hasChristmasPass) {
                 setFreeUsed(true);
                 await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
@@ -254,7 +264,6 @@ export default function Home() {
       console.error("Swap Error:", err);
       setIsLoading(false);
       
-      // DEFAULT: ERROR C (Total Meltdown / 500 / 429)
       let modalState = {
           title: "🍪 The elves are on a cookie break!",
           message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
@@ -297,7 +306,6 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
-    // 📊 TRACKING (Safe Fallback)
     if (deviceId) {
         supabase.rpc('increment_shares', { row_device_id: deviceId })
             .then(({ error }) => {
@@ -393,10 +401,14 @@ export default function Home() {
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce shadow-sm">✨ Christmas VIP Pass Active</div>
         )}
 
-        {/* 🎁 GIFT STATUS BANNER */}
+        {/* 🎁 GIFT STATUS BANNER (LOADING GATE) */}
         {!hasChristmasPass && (
-            <div className="w-full text-center py-4 mb-2">
-                {!freeUsed ? (
+            <div className="w-full text-center py-4 mb-2 min-h-[60px] flex items-center justify-center">
+                {isInitializing ? (
+                    <span className="text-gray-400 text-sm font-bold flex items-center gap-2">
+                        <span className="animate-spin">⏳</span> Connecting to North Pole...
+                    </span>
+                ) : !freeUsed ? (
                     <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm flex items-center justify-center gap-2 animate-pulse">
                         🎁 1 Free Magic Gift
                     </span>
@@ -470,9 +482,10 @@ export default function Home() {
 
           <button 
             onClick={handleSwap} 
-            disabled={!selectedFile || isLoading} 
+            // 🛑 BUTTON GATEKEEPER: Disabled if Initializing
+            disabled={!selectedFile || isLoading || isInitializing} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-2xl transition-all duration-300 transform
-                ${!selectedFile 
+                ${(!selectedFile || isInitializing)
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : isLoading 
                         ? 'bg-pink-500 text-white cursor-wait animate-pulse' 
@@ -485,7 +498,7 @@ export default function Home() {
                     {loadingMessage}
                 </span>
              ) : (
-                !selectedFile ? 'Select a Photo Above 👆' : 'Make the Magic! ✨'
+                isInitializing ? 'Checking Santa\'s List... 🎅' : (!selectedFile ? 'Select a Photo Above 👆' : 'Make the Magic! ✨')
              )}
           </button>
 
@@ -512,7 +525,7 @@ export default function Home() {
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <h2 className="text-2xl font-black text-center mb-4 text-teal-800 leading-tight">✨ It Worked! Look at the magic! ✨</h2>
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
-                {/* 🚨 REMOVED 'muted' ATTRIBUTE FOR AUTOPLAY SOUND */}
+                {/* 🚨 AUTOPLAY WITH SOUND (No Mute) */}
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline className="w-full h-full object-cover" />
               </div>
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95">
