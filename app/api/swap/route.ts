@@ -8,7 +8,6 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN!,
 });
 
-// Admin Client to bypass RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -18,16 +17,22 @@ export async function POST(request: NextRequest) {
   try {
     const { sourceImage, targetVideo } = await request.json();
     
-    // 1. IDENTIFY THE USER
+    // 1. AGGRESSIVE IP CAPTURE
     const deviceId = request.headers.get('x-device-id') || 'unknown';
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    
+    // Get IP from various headers to ensure we catch proxies/Vercel
+    let ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+             request.headers.get('x-real-ip') || 
+             'unknown';
+    
+    // Normalize Localhost IP for testing
+    if (ip === '::1') ip = '127.0.0.1';
 
-    console.log(`🎬 Swap Request: ${deviceId} (IP: ${ip})`);
+    console.log(`🕵️ GRANDMA FILTER: Checking Device: ${deviceId} | IP: ${ip}`);
 
-    // 2. SERVER-SIDE VALIDATION (The Bankruptcy Defense)
     let isAllowed = false;
 
-    // A. Check Registered User Status
+    // A. Check Registered User (Credits/Pass)
     const { data: user } = await supabaseAdmin
         .from('users')
         .select('christmas_pass, credits_remaining')
@@ -37,10 +42,9 @@ export async function POST(request: NextRequest) {
     if (user) {
         if (user.christmas_pass) {
             isAllowed = true;
-            console.log('✅ Access Granted: Christmas Pass Holder');
+            console.log('✅ Access Granted: Christmas Pass');
         } else if (user.credits_remaining > 0) {
             isAllowed = true;
-            // Decrement credit immediately
             await supabaseAdmin.from('users')
                 .update({ credits_remaining: user.credits_remaining - 1 })
                 .eq('device_id', deviceId);
@@ -48,34 +52,39 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // B. Check Guest/Free Tier (If not paid)
+    // B. Check Guest/Free Tier (The Anti-Exploit)
     if (!isAllowed) {
+        // Query looking for EITHER device_id match OR ip_address match
+        // Note: This relies on the 'guest_usage' table existing
         const { data: usage } = await supabaseAdmin
             .from('guest_usage')
             .select('*')
-            .or(`device_id.eq.${deviceId},ip_address.eq.${ip}`)
+            .or(`device_id.eq.${deviceId},ip_address.eq.${ip}`) 
             .maybeSingle();
 
-        if (usage && usage.swaps_count >= 1) {
-            console.warn(`⛔ Blocked: Free limit reached for ${deviceId}`);
+        if (usage) {
+            console.warn(`⛔ BLOCKED: Usage found for Device ${deviceId} or IP ${ip}`);
+            // If they are blocked, returning 402 triggers the Paywall Modal on Frontend
             return NextResponse.json({ error: "Free trial used! Upgrade to continue." }, { status: 402 });
         }
 
-        if (usage) {
-             await supabaseAdmin.from('guest_usage').update({ swaps_count: usage.swaps_count + 1 }).eq('id', usage.id);
-        } else {
-             await supabaseAdmin.from('guest_usage').insert({ device_id: deviceId, ip_address: ip, swaps_count: 1 });
-        }
+        // If we get here, they are truly new. Log them.
+        console.log(`📝 Logging new guest: ${deviceId} @ ${ip}`);
+        await supabaseAdmin.from('guest_usage').insert({ 
+            device_id: deviceId, 
+            ip_address: ip, 
+            swaps_count: 1 
+        });
+        
         isAllowed = true;
     }
 
-    // 3. EXECUTE AI (Only if Allowed)
+    // 3. EXECUTE AI
     // @ts-ignore
     const model = await replicate.models.get("xrunda", "hello");
     // @ts-ignore
     const versionId = model.latest_version?.id;
 
-    // ☢️ NUCLEAR FIX: Force TypeScript to ignore the next line so the build passes
     // @ts-ignore
     const prediction = await replicate.predictions.create({
       version: versionId,
@@ -96,7 +105,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET Polling logic
 export async function GET(request: NextRequest) {
     const id = request.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });

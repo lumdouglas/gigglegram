@@ -4,69 +4,68 @@ import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-// Initialize Admin Client (Bypasses Security Rules to update User)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // MUST be the Service Role Key!
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  }
-);
-
 export async function POST(request: NextRequest) {
   try {
-    // 1. Grab the raw body (Required for crypto verification)
-    const text = await request.text();
-    
-    // 2. Verify the Signature (Security First)
-    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET!; 
+    // 1. Validate Signature
+    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+    if (!secret) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+
+    const rawBody = await request.text();
     const hmac = crypto.createHmac('sha256', secret);
-    const digest = Buffer.from(hmac.update(text).digest('hex'), 'utf8');
+    const digest = Buffer.from(hmac.update(rawBody).digest('hex'), 'utf8');
     const signature = Buffer.from(request.headers.get('x-signature') || '', 'utf8');
 
     if (!crypto.timingSafeEqual(digest, signature)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // 3. Parse the Payload
-    const payload = JSON.parse(text);
-    const eventName = payload.meta.event_name;
-    
-    // 🚨 CRITICAL: Extract the Device ID we sent during checkout
-    const deviceId = payload.meta.custom_data?.device_id;
-    const userEmail = payload.data.attributes.user_email;
+    const payload = JSON.parse(rawBody);
+    const { meta, data } = payload;
+    const eventName = meta.event_name;
+    const customData = meta.custom_data || {};
+    const deviceId = customData.device_id;
+    const variantId = data.attributes.variant_id; // This tells us WHAT they bought
 
-    console.log(`🔔 Webhook received: ${eventName}`);
-
-    // 4. Handle "Order Created" (Successful Payment)
     if (eventName === 'order_created' && deviceId) {
-      console.log(`🎄 Christmas Pass Unlocked for Device: ${deviceId} (${userEmail})`);
+        
+        // 2. Init Admin Client (Standard Supabase Client)
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
-      // Update the user based on DEVICE_ID
-      const { error } = await supabase
-        .from('users') 
-        .update({ 
-            christmas_pass: true,     // Unlock the gate (Unlimited Access)
-            credits_remaining: 999,   // Visual indicator for "Unlimited"
-            email: userEmail          // Capture email for Magic Link restoration
-        })
-        .eq('device_id', deviceId);
+        console.log(`💰 Webhook: Order for Device ${deviceId}. Variant: ${variantId}`);
 
-      if (error) {
-        console.error('Supabase Update Failed:', error);
-        return NextResponse.json({ error: 'Update failed' }, { status: 500 });
-      }
+        // ⚠️ CRITICAL CONFIGURATION REQUIRED ⚠️
+        // You MUST find these numbers in your Lemon Squeezy Dashboard -> Products -> Variants
+        const CHRISTMAS_PASS_VARIANT_ID = "675e173b-4d24-4ef7-94ac-2e16979f6615"; // REPLACE WITH REAL ID (e.g. 518394)
+        const COOKIE_PACK_VARIANT_ID = "adf30529-5df7-4758-8d10-6194e30b54c7"; // REPLACE WITH REAL ID
+
+        // LOGIC: Distinguish between products
+        // We convert everything to strings to be safe against number/string mismatches
+        
+        if (String(variantId) === String(CHRISTMAS_PASS_VARIANT_ID)) { 
+             console.log("🎄 Unlocking Christmas Pass");
+             await supabase.from('users').update({ christmas_pass: true }).eq('device_id', deviceId);
+        } 
+        
+        // If it matches the Cookie Pack (or you can use `else` if you only have 2 products)
+        else {
+             console.log("🍪 Adding 10 Credits");
+             // Fetch current credits first
+             const { data: user } = await supabase.from('users').select('credits_remaining').eq('device_id', deviceId).single();
+             const current = user?.credits_remaining || 0;
+             
+             await supabase.from('users').update({ 
+                 credits_remaining: current + 10,
+                 free_swap_used: true // Stop them from getting the free trial again
+             }).eq('device_id', deviceId);
+        }
     }
 
-    // 5. Tell Lemon Squeezy "We got it"
     return NextResponse.json({ received: true });
-
-  } catch (error: any) {
-    console.error('Webhook Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error('Webhook Error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
