@@ -25,7 +25,7 @@ export default function Home() {
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // ✅ NEW STATE
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
@@ -60,70 +60,57 @@ export default function Home() {
       }
   };
 
-// 1. IDENTITY & PASS CHECK
+  // 1. IDENTITY & PASS CHECK
   useEffect(() => {
     if (isLocked) return;
 
-    // Define the check logic
     const checkUser = async (sessionUser: any = null) => {
       try {
-        // 1. Setup Fingerprint
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         setFingerprint(result.visitorId);
       } catch (e) { console.warn("Fingerprint failed"); }
 
-      // 2. Setup Device ID
+      const { data: { session } } = await supabase.auth.getSession();
       let currentId = localStorage.getItem('giggle_device_id');
+
       if (!currentId) {
         currentId = uuidv4();
         localStorage.setItem('giggle_device_id', currentId!);
       }
       setDeviceId(currentId);
 
-      // 3. Determine who we are looking for
-      // If we have a sessionUser (from listener), use email. Otherwise use deviceId.
       const lookupId = sessionUser?.email || currentId;
       const lookupCol = sessionUser?.email ? 'email' : 'device_id';
 
-      // 4. Update UI if logged in
       if (sessionUser?.email) {
           setUserEmail(sessionUser.email);
       }
 
-      // 5. Fetch Database Permissions
       const { data: user } = await supabase
           .from('users').select('*').eq(lookupCol, lookupId!).single();
 
       if (user) {
-          // If they have a pass, UNLOCK EVERYTHING
           if (user.christmas_pass) setHasChristmasPass(true);
-          
-          // Sync free usage status
           if (user.free_swap_used) setFreeUsed(true);
           
-          // If we just logged in, update the local device_id to match the account
           if (sessionUser?.email && user.device_id) {
               setDeviceId(user.device_id);
               localStorage.setItem('giggle_device_id', user.device_id);
           }
       } else {
-          // New Guest
           if (!sessionUser?.email) {
             await supabase.from('users').insert([{ device_id: currentId }]);
           }
       }
     };
 
-    // Run once on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
-    // LISTEN for Magic Link logins (The Fix)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
-            console.log("⚡ Auth Event: User Logged In", session.user.email);
             checkUser(session.user);
         }
     });
@@ -131,7 +118,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [isLocked]);
 
-  // 2. THE WAITING ROOM ANIMATION (Strict 6s Interval)
+  // 2. THE WAITING ROOM ANIMATION
   useEffect(() => {
     if (!isLoading) return;
     let msgIndex = 0;
@@ -139,7 +126,6 @@ export default function Home() {
 
     const interval = setInterval(() => {
       msgIndex++;
-      // Stop at the last message, don't loop endlessly
       if (msgIndex < LOADING_MESSAGES.length) {
           setLoadingMessage(LOADING_MESSAGES[msgIndex]);
       }
@@ -272,26 +258,20 @@ export default function Home() {
     }
   };
 
-  // ✅ NEW: FORCE DOWNLOAD LOGIC
   const handleDownload = async () => {
       if (!resultVideoUrl) return;
       setIsDownloading(true);
       try {
-        // 1. Fetch as blob
         const response = await fetch(resultVideoUrl);
         const blob = await response.blob();
-        
-        // 2. Create Object URL
         const blobUrl = window.URL.createObjectURL(blob);
         
-        // 3. Force Click
         const link = document.createElement('a');
         link.href = blobUrl;
         link.download = `GiggleGram-${Date.now()}.mp4`;
         document.body.appendChild(link);
         link.click();
         
-        // 4. Cleanup
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
       } catch (err) {
@@ -307,6 +287,7 @@ export default function Home() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
                 <h1 className="text-4xl mb-4">🚧</h1>
+                <h2 className="text-xl font-bold mb-4 text-gray-700">Site Locked</h2>
                 <input type="password" placeholder="Password" className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
                 <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600 transition-colors">Unlock</button>
             </div>
@@ -326,7 +307,6 @@ export default function Home() {
       </div>
 
       <div className="max-w-md mx-auto pt-8">
-        {/* 2. HEADLINE COPY OVERHAUL */}
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
         <p className="text-center text-gray-600 mb-8 text-lg font-medium">Choose a scene below to start! 👇</p>
 
@@ -336,7 +316,6 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           
-          {/* TEMPLATE SELECTOR */}
           <div className="mb-6">
             <div className="flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
                 {TEMPLATES.map((t) => (
@@ -389,16 +368,15 @@ export default function Home() {
 
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Photo deleted automatically.</span></div>
 
-          {/* 1. THE BUTTON TRAP */}
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-2xl transition-all duration-300 transform
                 ${!selectedFile 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // DEAD STATE
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : isLoading 
                         ? 'bg-pink-500 text-white cursor-wait animate-pulse' 
-                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer' // ACTIVE STATE
+                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer'
                 }`}
           >
              {isLoading ? (
@@ -419,13 +397,11 @@ export default function Home() {
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-4 ring-pink-100 aspect-square bg-black">
                 <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
               </div>
-              {/* PRIMARY BUTTON */}
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] hover:bg-[#20BA5A] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95">
                 <span className="text-3xl">🚀</span>
                 {isSharing ? 'Opening WhatsApp...' : 'Send to Family Group'}
               </button>
               
-              {/* SECONDARY BUTTON: SAVING SPINNER */}
               <button 
                 onClick={handleDownload}
                 disabled={isDownloading}
@@ -530,7 +506,7 @@ export default function Home() {
                     Already purchased? Restore Pass
                 </a>
                 <div className="mt-2 text-[10px] text-gray-400 flex items-center justify-center gap-1">
-                    <span>🔒</span> Secure Payment • Money-back Guarantee
+                    <span>🔒</span> One-time payment. No monthly fees. No subscription.
                 </div>
             </div>
 
