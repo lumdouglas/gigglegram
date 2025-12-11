@@ -26,22 +26,21 @@ export default function Home() {
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // 🔒 THE GATEKEEPER: Prevents "Refresh Exploit"
+  // 🔒 THE GATEKEEPER
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
   // MONETIZATION STATE
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [hasChristmasPass, setHasChristmasPass] = useState(false); 
+  const [credits, setCredits] = useState(0); // 🍪 NEW: CREDIT COUNTER
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
   const [paywallReason, setPaywallReason] = useState('pass'); 
   
-  // ERROR MODAL STATE
   const [errorModal, setErrorModal] = useState<{
     title: string;
     message: string;
@@ -50,16 +49,13 @@ export default function Home() {
     action: () => void;
   } | null>(null);
 
-  // PASSWORD STATE
   const [isLocked, setIsLocked] = useState(true);
   const [passwordInput, setPasswordInput] = useState('');
 
   // 0. CHECK PASSWORD
   useEffect(() => {
     const isUnlocked = localStorage.getItem('site_unlocked');
-    if (isUnlocked === 'true') {
-        setIsLocked(false);
-    }
+    if (isUnlocked === 'true') setIsLocked(false);
   }, []);
 
   const handleUnlock = () => {
@@ -71,7 +67,7 @@ export default function Home() {
       }
   };
 
-  // 1. IDENTITY & PASS CHECK (Now with LocalStorage Fallback)
+  // 1. IDENTITY & PASS CHECK
   useEffect(() => {
     if (isLocked) return;
 
@@ -92,7 +88,6 @@ export default function Home() {
         }
         setDeviceId(currentId);
 
-        // 🛑 CRITICAL: Check Local Cache First (Instant Lock)
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') {
             setFreeUsed(true);
@@ -111,12 +106,15 @@ export default function Home() {
         if (user) {
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
-                // Pass overrides free usage
                 setFreeUsed(false); 
-            } else if (user.free_swap_used) {
-                setFreeUsed(true);
-                // Ensure local cache matches DB
-                localStorage.setItem('giggle_free_used', 'true');
+            } else {
+                // 🍪 LOAD CREDITS
+                if (user.credits_remaining > 0) setCredits(user.credits_remaining);
+                
+                if (user.free_swap_used) {
+                    setFreeUsed(true);
+                    localStorage.setItem('giggle_free_used', 'true');
+                }
             }
             
             if (sessionUser?.email && user.device_id) {
@@ -176,14 +174,17 @@ export default function Home() {
     if (!selectedFile) return;
 
     // 🛑 PREMIUM GATEKEEPER
-    if (selectedTemplate.isPremium && !hasChristmasPass) {
+    if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
         setPaywallReason('premium');
         setShowPaywall(true); 
         return;
     }
 
     // 🛑 SOFT LOCK CHECK
-    if (!selectedTemplate.isPremium && freeUsed && !hasChristmasPass) {
+    // Allow if: Has Pass OR Has Credits OR Free Turn Available
+    const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
+
+    if (!isAllowed) {
         setPaywallReason('free_limit');
         setShowPaywall(true); 
         return; 
@@ -214,7 +215,6 @@ export default function Home() {
       
       const startData = await startRes.json();
       
-      // Handle Paywall Trigger
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -239,11 +239,15 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // ✅ MARK AS USED IMMEDIATELY
+            // ✅ SUCCESS STATE UPDATES
             if (!hasChristmasPass) {
-                setFreeUsed(true);
-                localStorage.setItem('giggle_free_used', 'true'); // 🛑 LOCAL LOCK
-                await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+                if (credits > 0) {
+                    setCredits(prev => prev - 1); // Decrement local credit
+                } else {
+                    setFreeUsed(true);
+                    localStorage.setItem('giggle_free_used', 'true'); 
+                    await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+                }
             }
 
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -308,7 +312,6 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     
-    // 📊 TRACKING
     if (deviceId) {
         supabase.rpc('increment_shares', { row_device_id: deviceId })
             .then(({ error }) => {
@@ -411,11 +414,18 @@ export default function Home() {
                     <span className="text-gray-400 text-sm font-bold flex items-center gap-2">
                         <span className="animate-spin">⏳</span> Connecting to North Pole...
                     </span>
+                ) : credits > 0 ? (
+                    // 🍪 CREDIT COUNTER
+                    <span className="bg-blue-100 text-blue-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm flex items-center justify-center gap-2">
+                        🍪 {credits} Cookies Left
+                    </span>
                 ) : !freeUsed ? (
+                    // 🎁 FREE GIFT
                     <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm flex items-center justify-center gap-2 animate-pulse">
                         🎁 1 Free Magic Gift
                     </span>
                 ) : (
+                    // 🔓 UNLOCK
                     <button 
                         onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }}
                         className="bg-rose-100 text-rose-800 text-lg font-bold px-6 py-2 rounded-full shadow-md animate-pulse border border-rose-200 hover:bg-rose-200 transition-colors flex items-center justify-center gap-2 mx-auto"
@@ -434,8 +444,13 @@ export default function Home() {
                     <button
                         key={t.id}
                         onClick={() => {
-                            if (t.isPremium && !hasChristmasPass) { setPaywallReason('premium'); setShowPaywall(true); } 
-                            else { setSelectedTemplate(t); }
+                            if (t.isPremium && !hasChristmasPass && credits <= 0) { 
+                                setPaywallReason('premium'); 
+                                setShowPaywall(true); 
+                            } 
+                            else { 
+                                setSelectedTemplate(t); 
+                            }
                         }}
                         className={`flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group ${selectedTemplate.id === t.id ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] scale-105 z-10' : 'border-transparent shadow-sm hover:scale-105 opacity-90'}`}
                     >
@@ -443,10 +458,10 @@ export default function Home() {
                             src={t.thumb} 
                             alt={t.name} 
                             className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 
-                                ${t.isPremium && !hasChristmasPass ? 'grayscale-[50%] opacity-80' : ''}`} 
+                                ${(t.isPremium && !hasChristmasPass && credits <= 0) ? 'grayscale-[50%] opacity-80' : ''}`} 
                         />
                         
-                        {t.isPremium && !hasChristmasPass && (
+                        {(t.isPremium && !hasChristmasPass && credits <= 0) && (
                             <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full shadow-md z-20 backdrop-blur-sm"><span className="text-xs">🔒</span></div>
                         )}
                         {!t.isPremium && (
