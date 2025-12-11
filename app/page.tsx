@@ -23,11 +23,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Removed old simple 'error' state, replaced with 'errorModal'
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // Default to the first free template
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
 
   // MONETIZATION STATE
@@ -39,6 +38,15 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null); 
   const [paywallReason, setPaywallReason] = useState('pass'); 
   
+  // ERROR MODAL STATE
+  const [errorModal, setErrorModal] = useState<{
+    title: string;
+    message: string;
+    btnText: string;
+    btnColor: string;
+    action: () => void;
+  } | null>(null);
+
   // PASSWORD STATE
   const [isLocked, setIsLocked] = useState(true);
   const [passwordInput, setPasswordInput] = useState('');
@@ -137,7 +145,7 @@ export default function Home() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
-      setError(null);
+      setErrorModal(null);
     }
   };
 
@@ -159,7 +167,7 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    setError(null);
+    setErrorModal(null);
 
     try {
       const filename = `${deviceId}-${Date.now()}.jpg`;
@@ -167,7 +175,7 @@ export default function Home() {
         .from('uploads') 
         .upload(filename, selectedFile);
       
-      if (uploadError) throw new Error("Upload failed: " + uploadError.message);
+      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
 
       const startRes = await fetch('/api/swap', {
         method: 'POST',
@@ -182,6 +190,8 @@ export default function Home() {
       });
       
       const startData = await startRes.json();
+      
+      // Handle Paywall Trigger
       if (startRes.status === 402) {
           setIsLoading(false);
           setFreeUsed(true); 
@@ -189,10 +199,18 @@ export default function Home() {
           setShowPaywall(true); 
           return;
       }
+
+      // Handle User Errors (400)
+      if (startRes.status === 400) throw { type: 'USER_ERROR' };
       
-      if (!startData.success) throw new Error(startData.error || 'Failed to start magic');
+      // Handle Server Errors (500/504)
+      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
+      
+      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
+      
       const predictionId = startData.id;
 
+      // POLLING LOOP
       while (true) {
         await new Promise(r => setTimeout(r, 3000));
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
@@ -211,20 +229,60 @@ export default function Home() {
             setResultVideoUrl(checkData.output);
             setIsLoading(false);
             break;
-        } else if (checkData.status === 'failed') {
-            throw new Error(checkData.error || 'Magic failed');
+        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+            // Check for specific Replicate error text
+            const errText = (checkData.error || '').toLowerCase();
+            if (errText.includes('face') || errText.includes('detect')) {
+                throw { type: 'USER_ERROR' };
+            }
+            throw { type: 'MELTDOWN' };
         }
       }
 
     } catch (err: any) {
       console.error("Swap Error:", err);
       setIsLoading(false);
+      
+      // DEFAULT: Total Meltdown (500)
+      let modalState = {
+          title: "🍪 The elves are on a cookie break!",
+          message: "We are making so much magic right now that the workshop is full. Please come back in 10 minutes! ⏰",
+          btnText: "Refresh Page",
+          btnColor: "bg-gray-500 hover:bg-gray-600 text-white",
+          action: () => window.location.reload()
+      };
+
+      const errorType = err.type || 'MELTDOWN';
       const errorMsg = (err.message || '').toLowerCase();
-      if (errorMsg.includes('face') || errorMsg.includes('detect')) {
-          setError("Uh oh! We couldn't see a face. Try a closer photo! 🧐");
-      } else {
-          setError('The magic fizzled out! Try again. ✨');
+
+      // ERROR STATE A: USER ERROR (400)
+      if (errorType === 'USER_ERROR' || errorMsg.includes('face') || errorMsg.includes('detect')) {
+          modalState = {
+              title: "🎅 The elves are scratching their heads!",
+              message: "We couldn't find a face in that photo. Please pick a clearer photo where your star is looking right at the camera! 📸",
+              btnText: "Pick a Different Photo",
+              btnColor: "bg-teal-600 hover:bg-teal-700 text-white",
+              action: () => { 
+                  setErrorModal(null); 
+                  setSelectedFile(null); // Force them to re-select
+              }
+          };
+      } 
+      // ERROR STATE B: SERVER HICCUP (504/Network)
+      else if (errorType === 'SERVER_HICCUP' || errorType === 'UPLOAD_FAIL' || errorMsg.includes('fetch')) {
+          modalState = {
+              title: "❄️ Whoops! A snowflake got stuck in the gears.",
+              message: "The magic stuttered just for a second. Please tap the button one more time! 🔄",
+              btnText: "Try Again",
+              btnColor: "bg-[#25D366] hover:bg-[#20BA5A] text-white",
+              action: () => {
+                  setErrorModal(null);
+                  handleSwap(); // Retry immediately
+              }
+          };
       }
+
+      setErrorModal(modalState);
     }
   };
 
@@ -373,10 +431,10 @@ export default function Home() {
             disabled={!selectedFile || isLoading} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-2xl transition-all duration-300 transform
                 ${!selectedFile 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // DEAD STATE
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : isLoading 
                         ? 'bg-pink-500 text-white cursor-wait animate-pulse' 
-                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer' // ACTIVE STATE
+                        : 'bg-[#25D366] hover:bg-[#20BA5A] text-white hover:scale-[1.02] active:scale-95 cursor-pointer'
                 }`}
           >
              {isLoading ? (
@@ -389,7 +447,24 @@ export default function Home() {
              )}
           </button>
 
-          {error && <div className="mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-center gap-3 animate-shake"><span className="text-2xl">🧐</span><p className="text-red-700 font-medium leading-tight">{error}</p></div>}
+          {/* NEW ERROR MODAL IMPLEMENTATION */}
+          {errorModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-gray-100">
+                    <div className="text-5xl mb-4 animate-bounce">
+                        {errorModal.title.includes("elves") ? "🤔" : errorModal.title.includes("cookie") ? "🍪" : "❄️"}
+                    </div>
+                    <h3 className="text-xl font-black text-gray-800 mb-2">{errorModal.title}</h3>
+                    <p className="text-gray-600 mb-6 font-medium">{errorModal.message}</p>
+                    <button 
+                        onClick={errorModal.action}
+                        className={`w-full py-4 rounded-xl font-bold shadow-lg transform active:scale-95 transition-all ${errorModal.btnColor}`}
+                    >
+                        {errorModal.btnText}
+                    </button>
+                </div>
+            </div>
+          )}
 
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
@@ -420,7 +495,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 🎅 THE "SUPER GRANDMA" PRICING MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
@@ -447,14 +521,12 @@ export default function Home() {
 
             <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* CARD 1: THE SAFE SNACK (Pink "Bonbon" Style) */}
                 <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-200 transition-colors bg-white">
                     <div>
                         <h4 className="text-lg font-bold text-gray-700">🍪 10 Magic Videos</h4>
                         <div className="text-3xl font-black text-gray-900 mt-2">$4.99</div>
                         <p className="text-sm text-gray-500 mt-1">Perfect for a small family.</p>
                     </div>
-                    {/* UPDATED PINK BUTTON */}
                     <a 
                         href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`}
                         className="block w-full bg-pink-200 hover:bg-pink-300 text-pink-900 font-bold py-3 rounded-xl text-center mt-6 transition-transform active:scale-95"
@@ -463,7 +535,6 @@ export default function Home() {
                     </a>
                 </div>
 
-                {/* CARD 2: THE SUPER GRANDMA PASS (Green Pulse) */}
                 <div className="border-4 border-yellow-400 rounded-2xl p-4 flex flex-col justify-between bg-yellow-50 relative shadow-lg transform sm:scale-105 z-10">
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full shadow-sm tracking-wider uppercase">
                         Best Value
