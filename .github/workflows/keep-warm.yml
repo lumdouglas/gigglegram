@@ -19,7 +19,7 @@ jobs:
             -H "Authorization: Token $REPLICATE_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{
-              "version": "104b4a39031d2347eb192453c9e6255761a2992925b4cb5871f3014e76a664e3",
+              "version": "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
               "input": {
                 "source": "https://replicate.delivery/pbxt/KPHH9y0...dummy_video.mp4", 
                 "target": "https://replicate.delivery/pbxt/KPHH...dummy_face.jpg"
