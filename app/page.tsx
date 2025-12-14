@@ -161,7 +161,7 @@ export default function Home() {
 
       const startRes = await fetch('/api/swap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-device-id': fingerprint || 'unknown' },
+        headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
         body: JSON.stringify({ 
             sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
             targetVideo: selectedTemplate.url 
