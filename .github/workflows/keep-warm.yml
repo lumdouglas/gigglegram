@@ -1,0 +1,28 @@
+name: Keep Replicate Model Warm
+
+on:
+  schedule:
+    # Run every 9 minutes (Replicate cold boots after ~10-15 mins)
+    - cron: '*/9 * * * *'
+  workflow_dispatch: # Adds a "Run Now" button in GitHub for testing
+
+jobs:
+  wake-up-gpu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Replicate
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          echo "Pinging Replicate to wake up GPU..."
+          curl -X POST \
+            -H "Authorization: Token $REPLICATE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "104b4a39031d2347eb192453c9e6255761a2992925b4cb5871f3014e76a664e3",
+              "input": {
+                "source": "https://replicate.delivery/pbxt/KPHH9y0...dummy_video.mp4", 
+                "target": "https://replicate.delivery/pbxt/KPHH...dummy_face.jpg"
+              }
+            }' \
+            https://api.replicate.com/v1/predictions
