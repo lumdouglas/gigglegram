@@ -26,7 +26,6 @@ export default function Home() {
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [debugStatus, setDebugStatus] = useState('Initializing...');
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
   
   // MONETIZATION
@@ -47,7 +46,6 @@ export default function Home() {
   useEffect(() => {
     const checkUser = async (sessionUser: any = null) => {
       try {
-        setDebugStatus('Checking ID...');
         try {
             const fp = await FingerprintJS.load();
             const result = await fp.get();
@@ -72,15 +70,10 @@ export default function Home() {
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
         // 🟢 POINTING TO 'magic_users'
-        const { data: user, error: fetchError } = await supabase
+        const { data: user } = await supabase
             .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
 
-        if (fetchError) {
-             setDebugStatus(`API Error: ${fetchError.message} (${fetchError.code})`);
-        }
-
         if (user) {
-            setDebugStatus('✅ User Found');
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
@@ -97,14 +90,12 @@ export default function Home() {
             }
         } else {
             if (!sessionUser?.email) {
-                setDebugStatus('Creating Profile...');
                 // 🟢 INSERTING INTO 'magic_users'
                 await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
-                setDebugStatus('✅ Profile Created');
             }
         }
       } catch (err: any) {
-          setDebugStatus(`Error: ${err.message}`);
+          console.error("Init Error:", err);
       } finally {
           setIsInitializing(false);
       }
@@ -344,8 +335,24 @@ export default function Home() {
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                <div className={`w-full h-48 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 ${selectedFile ? 'border-teal-400' : 'border-gray-100'}`}>
-                    {selectedFile ? <img src={URL.createObjectURL(selectedFile)} className="w-full h-full object-cover" /> : <span className="text-2xl">📸 Pick a Photo</span>}
+                {/* 📸 IMPROVED PHOTO CONTAINER: Taller (h-96) and better fit */}
+                <div className={`w-full h-96 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 transition-all duration-300 relative ${selectedFile ? 'bg-black border-teal-400' : 'bg-white hover:shadow-2xl border-gray-100'}`}>
+                    {selectedFile ? (
+                        <>
+                            <img src={URL.createObjectURL(selectedFile)} className="w-full h-full object-contain opacity-90" />
+                            {/* ✅ GREEN CHECKMARK OVERLAY RESTORED */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px] pointer-events-none">
+                                <span className="bg-white px-6 py-3 rounded-full font-black text-teal-600 shadow-2xl flex items-center gap-2 transform scale-110">
+                                    ✅ Photo Ready
+                                </span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-3"><span className="text-3xl">📸</span></div>
+                            <span className="text-2xl font-black text-gray-800">Pick a Photo</span>
+                        </div>
+                    )}
                 </div>
              </label>
           </div>
@@ -403,8 +410,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      <div className="fixed bottom-0 left-0 right-0 bg-black/90 text-green-400 text-[10px] font-mono p-2 text-center z-50">STATUS: {debugStatus} | ID: {deviceId?.slice(0,8)}...</div>
     </main>
   );
 }
