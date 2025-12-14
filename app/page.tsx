@@ -80,12 +80,11 @@ export default function Home() {
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        // 🟢 CHANGED: Pointing to 'profiles' instead of 'users' to fix 406 error
+        // 🟢 CHANGED: Pointing to 'magic_users' to fix 406 error
         const { data: user, error: fetchError } = await supabase
-            .from('profiles').select('*').eq(lookupCol, lookupId!).single();
+            .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
 
-        // Handle "Row not found" gracefully (it's not an API error, just a new user)
-        if (fetchError && fetchError.code !== 'PGRST116') {
+        if (fetchError) {
              setDebugStatus(`API Error: ${fetchError.message} (${fetchError.code})`);
         }
 
@@ -108,8 +107,8 @@ export default function Home() {
         } else {
             if (!sessionUser?.email) {
                 setDebugStatus('Creating Profile...');
-                // 🟢 CHANGED: Insert into 'profiles'
-                await supabase.from('profiles').insert([{ device_id: currentId, credits_remaining: 0 }]);
+                // 🟢 CHANGED: Insert into 'magic_users'
+                await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
                 setDebugStatus('✅ Profile Created');
             }
         }
@@ -204,8 +203,8 @@ export default function Home() {
           setIsLoading(false);
           setFreeUsed(true); 
           localStorage.setItem('giggle_free_used', 'true'); 
-          // 🟢 CHANGED: Update 'profiles'
-          await supabase.from('profiles').update({ free_swap_used: true }).eq('device_id', deviceId);
+          // 🟢 CHANGED: Update 'magic_users'
+          await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
@@ -230,8 +229,8 @@ export default function Home() {
                 } else {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true'); 
-                    // 🟢 CHANGED: Update 'profiles'
-                    await supabase.from('profiles').update({ free_swap_used: true }).eq('device_id', deviceId);
+                    // 🟢 CHANGED: Update 'magic_users'
+                    await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
                 }
             }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -272,11 +271,10 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     if (deviceId) {
-        // Note: RPC might need update if it references 'users' table specifically. 
-        // For now, let's just do a direct update to be safe and fast.
-        const { data } = await supabase.from('profiles').select('shares_count').eq('device_id', deviceId).single();
+        // Simple increment logic for magic_users
+        const { data } = await supabase.from('magic_users').select('shares_count').eq('device_id', deviceId).single();
         if (data) {
-             await supabase.from('profiles').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
+             await supabase.from('magic_users').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
         }
     }
     const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
