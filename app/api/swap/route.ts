@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // target: The user's face (The face)
     
     const prediction = await replicate.predictions.create({
-      version: "104b4a39031d2347eb192453c9e6255761a2992925b4cb5871f3014e76a664e3", // Locked to specific version
+      version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", // Locked to specific version
       input: {
         source: targetVideo,  // The Christmas Template
         target: sourceImage   // The User's Face
