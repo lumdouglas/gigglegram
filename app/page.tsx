@@ -41,19 +41,10 @@ export default function Home() {
   
   // UI
   const [errorModal, setErrorModal] = useState<any>(null);
-  const [isLocked, setIsLocked] = useState(true);
-  const [passwordInput, setPasswordInput] = useState('');
 
   // --- EFFECTS ---
 
   useEffect(() => {
-    const isUnlocked = localStorage.getItem('site_unlocked');
-    if (isUnlocked === 'true') setIsLocked(false);
-  }, []);
-
-  useEffect(() => {
-    if (isLocked) return;
-
     const checkUser = async (sessionUser: any = null) => {
       try {
         setDebugStatus('Checking ID...');
@@ -80,7 +71,7 @@ export default function Home() {
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        // 🟢 CHANGED: Pointing to 'magic_users' to fix 406 error
+        // 🟢 POINTING TO 'magic_users'
         const { data: user, error: fetchError } = await supabase
             .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
 
@@ -107,7 +98,7 @@ export default function Home() {
         } else {
             if (!sessionUser?.email) {
                 setDebugStatus('Creating Profile...');
-                // 🟢 CHANGED: Insert into 'magic_users'
+                // 🟢 INSERTING INTO 'magic_users'
                 await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
                 setDebugStatus('✅ Profile Created');
             }
@@ -131,7 +122,7 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, [isLocked]);
+  }, []);
 
   useEffect(() => {
     if (!isLoading) return;
@@ -147,15 +138,6 @@ export default function Home() {
   }, [isLoading]);
 
   // --- HANDLERS ---
-
-  const handleUnlock = () => {
-      if (passwordInput.toLowerCase() === 'doug') {
-          setIsLocked(false);
-          localStorage.setItem('site_unlocked', 'true');
-      } else {
-          alert('Wrong password!');
-      }
-  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -203,7 +185,7 @@ export default function Home() {
           setIsLoading(false);
           setFreeUsed(true); 
           localStorage.setItem('giggle_free_used', 'true'); 
-          // 🟢 CHANGED: Update 'magic_users'
+          // 🟢 UPDATE 'magic_users'
           await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
@@ -229,7 +211,7 @@ export default function Home() {
                 } else {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true'); 
-                    // 🟢 CHANGED: Update 'magic_users'
+                    // 🟢 UPDATE 'magic_users'
                     await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
                 }
             }
@@ -271,7 +253,6 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     if (deviceId) {
-        // Simple increment logic for magic_users
         const { data } = await supabase.from('magic_users').select('shares_count').eq('device_id', deviceId).single();
         if (data) {
              await supabase.from('magic_users').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
@@ -318,18 +299,6 @@ export default function Home() {
   };
 
   // --- RENDER ---
-
-  if (isLocked) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full">
-                <h1 className="text-4xl mb-4">🚧</h1>
-                <input type="password" placeholder="Password" className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-xl" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
-                <button onClick={handleUnlock} className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-600">Unlock</button>
-            </div>
-        </div>
-      );
-  }
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative pb-20">
@@ -407,7 +376,6 @@ export default function Home() {
               </button>
               <button onClick={handleDownload} disabled={isDownloading} className="block w-full mt-4 text-gray-500 underline text-sm text-center">⬇️ Save to phone</button>
               
-              {/* RETENTION WARNING (ESCAPED) */}
               <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 text-center shadow-sm">
                 <p className="text-sm text-amber-900 font-bold mb-1">⚠️ Don&apos;t lose your magic!</p>
                 <p className="text-xs text-amber-800 leading-snug">To protect your privacy, we do not keep a copy.<br/><strong className="font-black">Send it to your family now to save it forever!</strong></p>
