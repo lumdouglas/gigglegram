@@ -7,13 +7,13 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import TEMPLATES from '@/config/templates.json'; 
 
 const LOADING_MESSAGES = [
+  "🎅 Waking up the elves... (This can take a minute!)", 
+  "Still waking up... they were fast asleep! 😴",
+  "Okay, the elves are drinking their coffee... ☕",
+  "Almost ready! Putting on the elf hats... 🎩",
+  "✨ Magic is happening! (Any second now...)",
   "Connecting to the North Pole... 📡❄️",
-  "The elves are finding the magic dust... ✨",
-  "Santa is checking the list (twice!)... 📜🎅",
-  "Oh my goodness, the cuteness levels are HIGH! 👶🥰",
   "Sprinkling extra holiday cheer... 🎄❤️",
-  "Almost there! Wrapping it up... 🎁",
-  "The reindeer are landing... 🦌🔔",
   "HERE IT IS! ✨"
 ];
 
@@ -80,8 +80,14 @@ export default function Home() {
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        const { data: user } = await supabase
-            .from('users').select('*').eq(lookupCol, lookupId!).single();
+        // 🟢 CHANGED: Pointing to 'profiles' instead of 'users' to fix 406 error
+        const { data: user, error: fetchError } = await supabase
+            .from('profiles').select('*').eq(lookupCol, lookupId!).single();
+
+        // Handle "Row not found" gracefully (it's not an API error, just a new user)
+        if (fetchError && fetchError.code !== 'PGRST116') {
+             setDebugStatus(`API Error: ${fetchError.message} (${fetchError.code})`);
+        }
 
         if (user) {
             setDebugStatus('✅ User Found');
@@ -101,8 +107,10 @@ export default function Home() {
             }
         } else {
             if (!sessionUser?.email) {
-                setDebugStatus('Creating User...');
-                await supabase.from('users').insert([{ device_id: currentId, credits_remaining: 0 }]);
+                setDebugStatus('Creating Profile...');
+                // 🟢 CHANGED: Insert into 'profiles'
+                await supabase.from('profiles').insert([{ device_id: currentId, credits_remaining: 0 }]);
+                setDebugStatus('✅ Profile Created');
             }
         }
       } catch (err: any) {
@@ -196,7 +204,8 @@ export default function Home() {
           setIsLoading(false);
           setFreeUsed(true); 
           localStorage.setItem('giggle_free_used', 'true'); 
-          await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+          // 🟢 CHANGED: Update 'profiles'
+          await supabase.from('profiles').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
@@ -221,7 +230,8 @@ export default function Home() {
                 } else {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true'); 
-                    await supabase.from('users').update({ free_swap_used: true }).eq('device_id', deviceId);
+                    // 🟢 CHANGED: Update 'profiles'
+                    await supabase.from('profiles').update({ free_swap_used: true }).eq('device_id', deviceId);
                 }
             }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -262,7 +272,12 @@ export default function Home() {
     if (!resultVideoUrl) return;
     setIsSharing(true);
     if (deviceId) {
-        supabase.rpc('increment_shares', { row_device_id: deviceId }).then(() => {});
+        // Note: RPC might need update if it references 'users' table specifically. 
+        // For now, let's just do a direct update to be safe and fast.
+        const { data } = await supabase.from('profiles').select('shares_count').eq('device_id', deviceId).single();
+        if (data) {
+             await supabase.from('profiles').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
+        }
     }
     const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
     try {
