@@ -69,7 +69,6 @@ export default function Home() {
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        // 🟢 POINTING TO 'magic_users'
         const { data: user } = await supabase
             .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
 
@@ -90,7 +89,6 @@ export default function Home() {
             }
         } else {
             if (!sessionUser?.email) {
-                // 🟢 INSERTING INTO 'magic_users'
                 await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
             }
         }
@@ -176,7 +174,6 @@ export default function Home() {
           setIsLoading(false);
           setFreeUsed(true); 
           localStorage.setItem('giggle_free_used', 'true'); 
-          // 🟢 UPDATE 'magic_users'
           await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
           setPaywallReason('free_limit');
           setShowPaywall(true); 
@@ -202,7 +199,6 @@ export default function Home() {
                 } else {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true'); 
-                    // 🟢 UPDATE 'magic_users'
                     await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
                 }
             }
@@ -335,12 +331,14 @@ export default function Home() {
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                {/* 📸 IMPROVED PHOTO CONTAINER: Taller (h-96) and better fit */}
-                <div className={`w-full h-96 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 transition-all duration-300 relative ${selectedFile ? 'bg-black border-teal-400' : 'bg-white hover:shadow-2xl border-gray-100'}`}>
+                {/* 📸 FIX: 
+                   1. Height reduced from h-96 to h-64 to keep Button above fold.
+                   2. Object-fit changed to 'cover' with 'object-[50%_20%]' to focus on top-center (faces).
+                */}
+                <div className={`w-full h-64 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 transition-all duration-300 relative ${selectedFile ? 'bg-black border-teal-400' : 'bg-white hover:shadow-2xl border-gray-100'}`}>
                     {selectedFile ? (
                         <>
-                            <img src={URL.createObjectURL(selectedFile)} className="w-full h-full object-contain opacity-90" />
-                            {/* ✅ GREEN CHECKMARK OVERLAY RESTORED */}
+                            <img src={URL.createObjectURL(selectedFile)} className="w-full h-full object-cover object-[50%_20%]" />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px] pointer-events-none">
                                 <span className="bg-white px-6 py-3 rounded-full font-black text-teal-600 shadow-2xl flex items-center gap-2 transform scale-110">
                                     ✅ Photo Ready
