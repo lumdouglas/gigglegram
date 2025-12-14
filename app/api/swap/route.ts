@@ -16,70 +16,60 @@ const supabaseAdmin = createClient(
 export async function POST(request: NextRequest) {
   try {
     const { sourceImage, targetVideo } = await request.json();
-    
-    // 1. AGGRESSIVE IP CAPTURE
-    const deviceId = request.headers.get('x-device-id') || 'unknown';
-    
-    // Get IP from various headers to ensure we catch proxies/Vercel
-    let ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-             request.headers.get('x-real-ip') || 
-             'unknown';
-    
-    // Normalize Localhost IP for testing
-    if (ip === '::1') ip = '127.0.0.1';
+    const deviceId = request.headers.get('x-device-id');
 
-    console.log(`🕵️ GRANDMA FILTER: Checking Device: ${deviceId} | IP: ${ip}`);
+    console.log(`🕵️ API: Checking Device: ${deviceId}`);
+
+    // 1. Check the NEW 'magic_users' table
+    const { data: user } = await supabaseAdmin
+        .from('magic_users')
+        .select('*')
+        .eq('device_id', deviceId)
+        .maybeSingle();
 
     let isAllowed = false;
 
-    // A. Check Registered User (Credits/Pass)
-    const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('christmas_pass, credits_remaining')
-        .eq('device_id', deviceId)
-        .single();
-
     if (user) {
+        // A. Christmas Pass
         if (user.christmas_pass) {
             isAllowed = true;
-            console.log('✅ Access Granted: Christmas Pass');
-        } else if (user.credits_remaining > 0) {
+            console.log('✅ Access: Christmas Pass');
+        } 
+        // B. Has Credits
+        else if (user.credits_remaining > 0) {
             isAllowed = true;
-            await supabaseAdmin.from('users')
+            // Deduct 1 credit
+            await supabaseAdmin.from('magic_users')
                 .update({ credits_remaining: user.credits_remaining - 1 })
                 .eq('device_id', deviceId);
-            console.log('✅ Access Granted: Credit Used');
+            console.log('✅ Access: Credit Used');
+        } 
+        // C. Free Trial
+        else if (!user.free_swap_used) {
+            isAllowed = true;
+            // Mark free used
+            await supabaseAdmin.from('magic_users')
+                .update({ free_swap_used: true })
+                .eq('device_id', deviceId);
+            console.log('✅ Access: Free Gift Used');
         }
-    }
-
-    // B. Check Guest/Free Tier (The Anti-Exploit)
-    if (!isAllowed) {
-        // Query looking for EITHER device_id match OR ip_address match
-        // Note: This relies on the 'guest_usage' table existing
-        const { data: usage } = await supabaseAdmin
-            .from('guest_usage')
-            .select('*')
-            .or(`device_id.eq.${deviceId},ip_address.eq.${ip}`) 
-            .maybeSingle();
-
-        if (usage) {
-            console.warn(`⛔ BLOCKED: Usage found for Device ${deviceId} or IP ${ip}`);
-            // If they are blocked, returning 402 triggers the Paywall Modal on Frontend
-            return NextResponse.json({ error: "Free trial used! Upgrade to continue." }, { status: 402 });
-        }
-
-        // If we get here, they are truly new. Log them.
-        console.log(`📝 Logging new guest: ${deviceId} @ ${ip}`);
-        await supabaseAdmin.from('guest_usage').insert({ 
+    } else {
+        // Fallback if frontend created profile but backend can't find it yet (rare)
+        // We create it on the fly to allow the free usage
+        console.log('📝 Creating magic_user on backend...');
+        await supabaseAdmin.from('magic_users').insert({ 
             device_id: deviceId, 
-            ip_address: ip, 
-            swaps_count: 1 
+            free_swap_used: true,
+            credits_remaining: 0 
         });
-        
         isAllowed = true;
     }
 
-    // 3. EXECUTE AI
+    if (!isAllowed) {
+        return NextResponse.json({ error: "Limit reached" }, { status: 402 });
+    }
+
+    // 2. EXECUTE AI
     // @ts-ignore
     const model = await replicate.models.get("xrunda", "hello");
     // @ts-ignore
