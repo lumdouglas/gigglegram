@@ -294,11 +294,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative pb-20">
+      
+      {/* HEADER WITH LOGOUT */}
       <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
         {userEmail ? (
             <div className="flex flex-col items-end gap-1">
                 <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100">👤 {userEmail.split('@')[0]}</span>
-                <button onClick={handleLogout} className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-white/80 px-3 py-1 rounded-full border border-rose-100 shadow-sm transition-colors">Log Out</button>
+                <button onClick={handleLogout} className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-white/80 px-3 py-1 rounded-full border border-rose-100 shadow-sm transition-colors cursor-pointer">Log Out</button>
             </div>
         ) : (
             <a href="/login" className="text-sm font-bold text-teal-700 underline decoration-pink-300">Log In</a>
@@ -312,12 +314,20 @@ export default function Home() {
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce">✨ Christmas VIP Pass Active</div>
         )}
 
+        {/* CREDIT DISPLAY LOGIC */}
         {!hasChristmasPass && (
             <div className="w-full text-center py-4 mb-2 min-h-[60px] flex items-center justify-center">
                 {isInitializing ? (
                     <span className="text-gray-400 text-sm font-bold flex items-center gap-2"><span className="animate-spin">⏳</span> Connecting...</span>
                 ) : credits > 0 ? (
-                    <span className="bg-blue-100 text-blue-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm">🍪 {credits} Cookies Left</span>
+                    // 🟢 CHANGED: Now a button so users can buy more even if they have credits
+                    <button 
+                        onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }} 
+                        className="bg-blue-100 text-blue-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm hover:bg-blue-200 transition-colors flex items-center gap-2 active:scale-95"
+                    >
+                        <span>🍪 {credits} Cookies Left</span>
+                        <span className="text-xs bg-white/60 text-blue-900 px-2 py-0.5 rounded-full font-bold">+ Add</span>
+                    </button>
                 ) : !freeUsed ? (
                     <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm animate-pulse">🎁 1 Free Magic Gift</span>
                 ) : (
@@ -339,10 +349,6 @@ export default function Home() {
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                {/* 📸 FIX: 
-                   1. Height reduced from h-96 to h-64 to keep Button above fold.
-                   2. Object-fit changed to 'cover' with 'object-[50%_20%]' to focus on top-center (faces).
-                */}
                 <div className={`w-full h-64 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 transition-all duration-300 relative ${selectedFile ? 'bg-black border-teal-400' : 'bg-white hover:shadow-2xl border-gray-100'}`}>
                     {selectedFile ? (
                         <>
