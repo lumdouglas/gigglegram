@@ -21,8 +21,8 @@ jobs:
             -d '{
               "version": "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
               "input": {
-                "source": "https://replicate.delivery/pbxt/KPHH9y0...dummy_video.mp4", 
-                "target": "https://replicate.delivery/pbxt/KPHH...dummy_face.jpg"
+                "source": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+                "target": "https://upload.wikimedia.org/wikipedia/commons/8/85/Elon_Musk_Royal_Society_%28crop1%29.jpg"
               }
             }' \
             https://api.replicate.com/v1/predictions
