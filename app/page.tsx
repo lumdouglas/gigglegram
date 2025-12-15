@@ -397,11 +397,11 @@ export default function Home() {
              <div className="text-center mb-6"><div className="text-5xl mb-2">🎄</div><h3 className="text-xl font-bold text-black text-center mb-2">Woah! You loved that one?</h3><p className="text-gray-500">Choose a pass to keep going!</p></div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="border-2 border-gray-200 rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white text-center block">
-                    <h4 className="font-medium text-black">🍪 10 Magic Videos</h4><div className="font-bold text-black">$4.99</div><div className="mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl">Get 10 Videos</div>
+                    <h4 className="font-bold text-lg text-black">🍪 10 Magic Videos</h4><div className="font-bold text-xl text-black">$4.99</div><div className="mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl">Get 10 Videos</div>
                 </a>
                 <a href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`} className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block">
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-xs font-black px-3 py-1 rounded-full">BEST VALUE</div>
-                    <h4 className="font-medium text-black">🎅 Super Grandma Pass</h4><div className="font-bold text-black">$29.99</div><div className="mt-4 bg-[#25D366] text-white font-black py-3 rounded-xl animate-pulse">Get Unlimited Magic</div>
+                    <h4 className="font-bold text-lg text-black">🎅 Super Grandma Pass</h4><div className="font-bold text-xl text-black">$29.99</div><div className="mt-4 bg-[#25D366] text-white font-black py-3 rounded-xl animate-pulse">Get Unlimited Magic</div>
                 </a>
              </div>
              <div className="mt-6 text-center text-xs text-gray-400"><a href="/login" className="underline text-teal-600">Restore Purchase</a><br/>One-time payment. No subscription.</div>
