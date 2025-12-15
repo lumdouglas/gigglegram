@@ -1,410 +1,361 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid'; 
-import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import TEMPLATES from '@/config/templates.json'; 
+import { useState, useEffect, useRef } from 'react';
+import { Upload, Zap, X, Loader2, Play, Image as ImageIcon } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-const LOADING_MESSAGES = [
-  "🎅 Waking up the elves... (This can take a minute!)", 
-  "Still waking up... they were fast asleep! 😴",
-  "Okay, the elves are drinking their coffee... ☕",
-  "Almost ready! Putting on the elf hats... 🎩",
-  "✨ Magic is happening! (Any second now...)",
-  "Connecting to the North Pole... 📡❄️",
-  "Sprinkling extra holiday cheer... 🎄❤️",
-  "HERE IT IS! ✨"
-];
+// Initialize Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function Home() {
-  // --- STATE ---
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
-  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
-  
-  // MONETIZATION
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [hasChristmasPass, setHasChristmasPass] = useState(false); 
-  const [credits, setCredits] = useState(0); 
-  const [freeUsed, setFreeUsed] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null); 
-  const [paywallReason, setPaywallReason] = useState('pass'); 
-  
-  // UI
-  const [errorModal, setErrorModal] = useState<any>(null);
+  // --- STATE MANAGEMENT ---
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [faceFile, setFaceFile] = useState<File | null>(null);
+  const [resultVideo, setResultVideo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string>('');
+  const [credits, setCredits] = useState<number>(0);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  // --- EFFECTS ---
+  // File input refs
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const faceInputRef = useRef<HTMLInputElement>(null);
 
+  // --- 1. DEVICE ID & AUTH SETUP ---
   useEffect(() => {
-    const checkUser = async (sessionUser: any = null) => {
-      try {
-        try {
-            const fp = await FingerprintJS.load();
-            const result = await fp.get();
-            setFingerprint(result.visitorId);
-        } catch (e) { console.warn("FP failed"); }
+    let id = localStorage.getItem('device_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('device_id', id);
+    }
+    setDeviceId(id);
 
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        let currentId = localStorage.getItem('giggle_device_id');
-        if (!currentId) {
-            currentId = uuidv4();
-            localStorage.setItem('giggle_device_id', currentId!);
-        }
-        setDeviceId(currentId);
-
-        const localFreeUsed = localStorage.getItem('giggle_free_used');
-        if (localFreeUsed === 'true') setFreeUsed(true);
-
-        const lookupId = sessionUser?.email || currentId;
-        const lookupCol = sessionUser?.email ? 'email' : 'device_id';
-
-        if (sessionUser?.email) setUserEmail(sessionUser.email);
-
-        const { data: user } = await supabase
-            .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
-
-        if (user) {
-            if (user.christmas_pass) {
-                setHasChristmasPass(true);
-                setFreeUsed(false); 
-            } else {
-                if (user.credits_remaining > 0) setCredits(user.credits_remaining);
-                if (user.free_swap_used) {
-                    setFreeUsed(true);
-                    localStorage.setItem('giggle_free_used', 'true');
-                }
-            }
-            if (sessionUser?.email && user.device_id) {
-                setDeviceId(user.device_id);
-                localStorage.setItem('giggle_device_id', user.device_id);
-            }
-        } else {
-            if (!sessionUser?.email) {
-                await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
-            }
-        }
-      } catch (err: any) {
-          console.error("Init Error:", err);
-      } finally {
-          setIsInitializing(false);
-      }
+    // Check user session
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserEmail(user.email || null);
     };
+    getUser();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        checkUser(session?.user);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-            setIsInitializing(true);
-            checkUser(session.user);
-        }
+    // Auth listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email || null);
+      fetchCredits(); 
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- 2. FETCH CREDITS ---
+  const fetchCredits = async () => {
+    let query = supabase.from('magic_users').select('credits_remaining');
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // If logged in, check by email. If guest, check by device_id.
+    if (user) {
+      query = query.eq('email', user.email);
+    } else {
+      const id = localStorage.getItem('device_id');
+      query = query.eq('device_id', id);
+    }
+
+    const { data } = await query.single();
+    if (data) {
+      setCredits(data.credits_remaining);
+    } else {
+      setCredits(0);
+    }
+  };
+
   useEffect(() => {
-    if (!isLoading) return;
-    let msgIndex = 0;
-    setLoadingMessage(LOADING_MESSAGES[0]); 
-    const interval = setInterval(() => {
-      msgIndex++;
-      if (msgIndex < LOADING_MESSAGES.length) {
-          setLoadingMessage(LOADING_MESSAGES[msgIndex]);
-      }
-    }, 8000); 
-    return () => clearInterval(interval);
-  }, [isLoading]);
+    fetchCredits();
+  }, [deviceId]);
 
-  // --- HANDLERS ---
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-      setErrorModal(null);
-    }
+  // --- 3. LOGOUT LOGIC ---
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.clear(); 
+    window.location.reload();
   };
 
-  const handleSwap = async () => {
-    if (!selectedFile) return;
-
-    if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
-        setPaywallReason('premium');
-        setShowPaywall(true); 
-        return;
+  // --- 4. UPLOAD LOGIC ---
+  const handleUpload = async () => {
+    if (credits < 1) {
+      setShowPayModal(true);
+      return;
     }
 
-    const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
-    if (!isAllowed) {
-        setPaywallReason('free_limit');
-        setShowPaywall(true); 
-        return; 
+    if (!videoFile || !faceFile) {
+      setError("Please select both a video and a face photo!");
+      return;
     }
 
-    setIsLoading(true);
-    setErrorModal(null);
+    setLoading(true);
+    setError(null);
+    setResultVideo(null);
 
     try {
-      const filename = `${deviceId}-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from('uploads').upload(filename, selectedFile);
-      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      formData.append('face', faceFile);
 
-      const startRes = await fetch('/api/swap', {
+      const response = await fetch('/api/swap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
-        body: JSON.stringify({ 
-            sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
-            targetVideo: selectedTemplate.url 
-        }),
+        headers: {
+          'x-device-id': deviceId || 'unknown', 
+        },
+        body: formData,
       });
-      
-      const startData = await startRes.json();
-      
-      if (startRes.status === 402) {
-          setIsLoading(false);
-          setFreeUsed(true); 
-          localStorage.setItem('giggle_free_used', 'true'); 
-          await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
-          setPaywallReason('free_limit');
-          setShowPaywall(true); 
-          return;
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate video');
       }
 
-      if (startRes.status === 400) throw { type: 'USER_ERROR' };
-      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
-      if (startRes.status === 429) throw { type: 'MELTDOWN' };
-      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
-      
-      const predictionId = startData.id;
-
-      while (true) {
-        await new Promise(r => setTimeout(r, 3000));
-        const checkRes = await fetch(`/api/swap?id=${predictionId}`);
-        const checkData = await checkRes.json();
-
-        if (checkData.status === 'succeeded') {
-            if (!hasChristmasPass) {
-                if (credits > 0) {
-                    setCredits(prev => prev - 1); 
-                } else {
-                    setFreeUsed(true);
-                    localStorage.setItem('giggle_free_used', 'true'); 
-                    await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
-                }
-            }
-            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            setResultVideoUrl(checkData.output);
-            setIsLoading(false);
-            break;
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            const errText = (checkData.error || '').toLowerCase();
-            if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
-            throw { type: 'MELTDOWN' };
-        }
-      }
+      setResultVideo(data.url);
+      fetchCredits();
     } catch (err: any) {
-      console.error("Swap Error:", err);
-      setIsLoading(false);
-      let modal = {
-          title: "🍪 The elves are on a cookie break!",
-          message: "Please come back in 10 minutes!",
-          btnText: "Refresh Page",
-          btnColor: "bg-gray-500 text-white",
-          action: () => window.location.reload()
-      };
-      const type = err.type || 'MELTDOWN';
-      if (type === 'USER_ERROR') {
-          modal = {
-              title: "🎅 No face found!",
-              message: "Please pick a clearer photo where they are looking at the camera!",
-              btnText: "Try Again",
-              btnColor: "bg-teal-600 text-white",
-              action: () => { setErrorModal(null); setSelectedFile(null); }
-          };
-      }
-      setErrorModal(modal);
-    }
-  };
-
-  const handleSmartShare = async () => {
-    if (!resultVideoUrl) return;
-    setIsSharing(true);
-    if (deviceId) {
-        const { data } = await supabase.from('magic_users').select('shares_count').eq('device_id', deviceId).single();
-        if (data) {
-             await supabase.from('magic_users').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
-        }
-    }
-    const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
-    try {
-        if (navigator.share) {
-            const response = await fetch(resultVideoUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'magic.mp4', { type: 'video/mp4' });
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'My GiggleGram', text: shareText });
-                return; 
-            }
-        }
-        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
-    } catch (err) {
-        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
+      console.error(err);
+      setError(err.message || 'Something went wrong');
     } finally {
-        setIsSharing(false);
+      setLoading(false);
     }
   };
-
-  const handleDownload = async () => {
-      if (!resultVideoUrl) return;
-      setIsDownloading(true);
-      try {
-        const response = await fetch(resultVideoUrl);
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `GiggleGram-${Date.now()}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      } catch (err) {
-        alert("Saving failed. Try long-pressing the video!");
-      } finally {
-        setIsDownloading(false);
-      }
-  };
-
-  // --- RENDER ---
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative pb-20">
-      <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
-        {userEmail ? (
-            <span className="text-xs font-medium text-teal-800 bg-white/80 px-3 py-1 rounded-full border border-teal-100">👤 {userEmail.split('@')[0]}</span>
-        ) : (
-            <a href="/login" className="text-sm font-bold text-teal-700 underline decoration-pink-300">Log In</a>
-        )}
-      </div>
-
-      <div className="max-w-md mx-auto pt-8">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
-        
-        {hasChristmasPass && (
-            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce">✨ Christmas VIP Pass Active</div>
-        )}
-
-        {!hasChristmasPass && (
-            <div className="w-full text-center py-4 mb-2 min-h-[60px] flex items-center justify-center">
-                {isInitializing ? (
-                    <span className="text-gray-400 text-sm font-bold flex items-center gap-2"><span className="animate-spin">⏳</span> Connecting...</span>
-                ) : credits > 0 ? (
-                    <span className="bg-blue-100 text-blue-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm">🍪 {credits} Cookies Left</span>
-                ) : !freeUsed ? (
-                    <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm animate-pulse">🎁 1 Free Magic Gift</span>
-                ) : (
-                    <button onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }} className="bg-rose-100 text-rose-800 text-lg font-bold px-6 py-2 rounded-full shadow-md animate-pulse border border-rose-200">🔓 Unlock Unlimited Magic</button>
-                )}
-            </div>
-        )}
-
-        <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
-          <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
-            {TEMPLATES.map((t) => (
-                <button key={t.id} onClick={() => { if (t.isPremium && !hasChristmasPass && credits <= 0) { setPaywallReason('premium'); setShowPaywall(true); } else { setSelectedTemplate(t); } }} className={`flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center ${selectedTemplate.id === t.id ? 'border-yellow-400 scale-105 z-10' : 'border-transparent opacity-90'}`}>
-                    <img src={t.thumb} alt={t.name} className={`w-full h-full object-cover ${(t.isPremium && !hasChristmasPass && credits <= 0) ? 'grayscale opacity-80' : ''}`} />
-                    {(t.isPremium && !hasChristmasPass && credits <= 0) && <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs">🔒</div>}
-                </button>
-            ))}
+    <main className="min-h-screen bg-white text-black p-4 flex flex-col items-center relative">
+      
+      {/* 🎅 SANTA WAITING ROOM (LOADING OVERLAY) 🎅 */}
+      {loading && (
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center text-white animate-in fade-in duration-500">
+          <div className="text-6xl mb-4 animate-bounce">🎅</div>
+          <h2 className="text-3xl font-bold text-red-500 mb-2">Santa is working!</h2>
+          <p className="text-gray-300 text-lg text-center max-w-md px-4">
+            Creating your magic video...<br/>
+            This takes about 20-30 seconds.
+          </p>
+          <div className="mt-8">
+            <Loader2 className="w-10 h-10 animate-spin text-white" />
           </div>
-
-          <div className="mb-8">
-             <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
-                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                {/* 📸 FIX: 
-                   1. Height reduced from h-96 to h-64 to keep Button above fold.
-                   2. Object-fit changed to 'cover' with 'object-[50%_20%]' to focus on top-center (faces).
-                */}
-                <div className={`w-full h-64 rounded-3xl shadow-xl flex flex-col items-center justify-center overflow-hidden border-4 transition-all duration-300 relative ${selectedFile ? 'bg-black border-teal-400' : 'bg-white hover:shadow-2xl border-gray-100'}`}>
-                    {selectedFile ? (
-                        <>
-                            <img src={URL.createObjectURL(selectedFile)} className="w-full h-full object-cover object-[50%_20%]" />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px] pointer-events-none">
-                                <span className="bg-white px-6 py-3 rounded-full font-black text-teal-600 shadow-2xl flex items-center gap-2 transform scale-110">
-                                    ✅ Photo Ready
-                                </span>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="flex flex-col items-center">
-                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-3"><span className="text-3xl">📸</span></div>
-                            <span className="text-2xl font-black text-gray-800">Pick a Photo</span>
-                        </div>
-                    )}
-                </div>
-             </label>
-          </div>
-
-          <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Powered by AI Magic. Photo deleted immediately.</span></div>
-
-          <button onClick={handleSwap} disabled={!selectedFile || isLoading || isInitializing} className={`w-full py-6 rounded-2xl text-2xl font-black shadow-xl transition-all ${(!selectedFile || isInitializing) ? 'bg-gray-300' : isLoading ? 'bg-pink-500 animate-pulse' : 'bg-[#25D366] active:scale-95 text-white'}`}>
-             {isLoading ? loadingMessage : isInitializing ? 'Loading...' : !selectedFile ? 'Select a Photo Above 👆' : 'Make the Magic! ✨'}
-          </button>
-
-          {errorModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-                <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
-                    <h3 className="text-xl font-bold mb-2">{errorModal.title}</h3>
-                    <p className="mb-4">{errorModal.message}</p>
-                    <button onClick={errorModal.action} className={`w-full py-3 rounded-xl font-bold ${errorModal.btnColor}`}>{errorModal.btnText}</button>
-                </div>
-            </div>
-          )}
-
-          {resultVideoUrl && (
-            <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
-              <div className="relative rounded-2xl shadow-2xl overflow-hidden aspect-square bg-black">
-                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline className="w-full h-full object-cover" />
-              </div>
-              <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
-                🚀 {isSharing ? 'Opening...' : 'Send to Family'}
-              </button>
-              <button onClick={handleDownload} disabled={isDownloading} className="block w-full mt-4 text-gray-500 underline text-sm text-center">⬇️ Save to phone</button>
-              
-              <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 text-center shadow-sm">
-                <p className="text-sm text-amber-900 font-bold mb-1">⚠️ Don&apos;t lose your magic!</p>
-                <p className="text-xs text-amber-800 leading-snug">To protect your privacy, we do not keep a copy.<br/><strong className="font-black">Send it to your family now to save it forever!</strong></p>
-              </div>
-            </div>
-          )}
         </div>
+      )}
+
+      {/* HEADER BAR */}
+      <div className="flex justify-between items-center w-full max-w-xl mb-8 mt-4">
+        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600">
+          GiggleGram
+        </h1>
+        <button
+          onClick={handleLogout}
+          className="text-sm font-medium text-gray-500 hover:text-black hover:underline transition-colors"
+        >
+          Logout
+        </button>
       </div>
 
-      {showPaywall && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative p-6">
-             <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-2 bg-gray-200 rounded-full">✕</button>
-             <div className="text-center mb-6"><div className="text-5xl mb-2">🎄</div><h3 className="text-xl font-bold text-black text-center mb-2">Woah! You loved that one?</h3><p className="text-gray-500">Choose a pass to keep going!</p></div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="border-2 border-gray-200 rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white text-center block">
-                    <h4 className="font-bold text-lg text-black">🍪 10 Magic Videos</h4><div className="font-bold text-xl text-black">$4.99</div><div className="mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl">Get 10 Videos</div>
-                </a>
-                <a href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`} className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-xs font-black px-3 py-1 rounded-full">BEST VALUE</div>
-                    <h4 className="font-bold text-lg text-black">🎅 Super Grandma Pass</h4><div className="font-bold text-xl text-black">$29.99</div><div className="mt-4 bg-[#25D366] text-white font-black py-3 rounded-xl animate-pulse">Get Unlimited Magic</div>
-                </a>
-             </div>
-             <div className="mt-6 text-center text-xs text-gray-400"><a href="/login" className="underline text-teal-600">Restore Purchase</a><br/>One-time payment. No subscription.</div>
+      {/* CREDITS DISPLAY */}
+      <div className="mb-6 flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full">
+        <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+        <span className="font-semibold text-sm">
+          {credits} Credits Remaining
+        </span>
+        <button 
+          onClick={() => setShowPayModal(true)}
+          className="ml-2 text-xs bg-black text-white px-2 py-1 rounded-md hover:bg-gray-800"
+        >
+          Buy More
+        </button>
+      </div>
+
+      <div className="w-full max-w-xl space-y-8">
+        
+        {/* INPUT SECTION */}
+        <div className="grid grid-cols-2 gap-4">
+          
+          {/* VIDEO INPUT */}
+          <div 
+            onClick={() => videoInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-all aspect-square text-center relative overflow-hidden"
+          >
+            {videoFile ? (
+              <div className="relative w-full h-full flex items-center justify-center">
+                <video 
+                  src={URL.createObjectURL(videoFile)} 
+                  className="absolute inset-0 w-full h-full object-cover rounded-lg opacity-50" 
+                />
+                <span className="relative z-10 font-medium text-black bg-white/80 px-2 py-1 rounded">
+                  Change Video
+                </span>
+              </div>
+            ) : (
+              <>
+                <Play className="w-8 h-8 text-gray-400 mb-2" />
+                <span className="text-sm font-medium text-gray-500">
+                  Tap to add<br/>Target Video
+                </span>
+              </>
+            )}
+            <input 
+              type="file" 
+              ref={videoInputRef}
+              accept="video/*" 
+              className="hidden" 
+              onChange={(e) => e.target.files && setVideoFile(e.target.files[0])} 
+            />
+          </div>
+
+          {/* FACE INPUT */}
+          <div 
+            onClick={() => faceInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-pink-500 hover:bg-pink-50 transition-all aspect-square text-center relative overflow-hidden"
+          >
+             {faceFile ? (
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img 
+                  src={URL.createObjectURL(faceFile)} 
+                  alt="Face" 
+                  className="absolute inset-0 w-full h-full object-cover rounded-lg opacity-50" 
+                />
+                <span className="relative z-10 font-medium text-black bg-white/80 px-2 py-1 rounded">
+                  Change Face
+                </span>
+              </div>
+            ) : (
+              <>
+                <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                <span className="text-sm font-medium text-gray-500">
+                  Tap to add<br/>Your Face
+                </span>
+              </>
+            )}
+            <input 
+              type="file" 
+              ref={faceInputRef}
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => e.target.files && setFaceFile(e.target.files[0])} 
+            />
+          </div>
+        </div>
+
+        {/* ERROR MESSAGE */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        {/* MAGIC BUTTON */}
+        <button
+          onClick={handleUpload}
+          disabled={loading}
+          className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
+            ${loading 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+            }`}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-6 h-6 animate-spin" />
+              Starting...
+            </>
+          ) : (
+            <>
+              <Zap className="w-6 h-6 fill-current" />
+              Make Magic
+            </>
+          )}
+        </button>
+
+        {/* RESULT SECTION */}
+        {resultVideo && (
+          <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="text-xl font-bold text-black text-center mb-2">
+              Woah! You loved that one?
+            </h3>
+            <div className="rounded-xl overflow-hidden shadow-2xl border-4 border-black bg-black">
+              <video 
+                src={resultVideo} 
+                controls 
+                autoPlay 
+                loop 
+                className="w-full"
+              />
+            </div>
+            <a 
+              href={resultVideo} 
+              download="gigglegram.mp4"
+              className="block mt-4 text-center text-purple-600 font-semibold hover:underline"
+            >
+              Download Video
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* --- PAYMENT MODAL --- */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+            
+            <button
+              onClick={() => setShowPayModal(false)}
+              className="absolute top-4 right-4 p-2 text-black hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 mb-3">
+                <Zap className="w-6 h-6 text-purple-600 fill-purple-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-black">Need more magic?</h2>
+              <p className="text-gray-500 mt-1">
+                You've used up your free credits! Top up to keep creating.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <a
+                href={process.env.NEXT_PUBLIC_STRIPE_LINK_LOW}
+                className="block w-full border-2 border-gray-200 rounded-xl p-4 hover:border-purple-500 hover:bg-purple-50 transition-all group text-left"
+              >
+                <div className="flex justify-between items-center">
+                  <div className="font-bold text-lg text-black">10 Magic Videos</div>
+                  <div className="font-bold text-xl text-black">$4.99</div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1 group-hover:text-purple-600">
+                  Perfect for a quick laugh
+                </div>
+              </a>
+
+              <a
+                href={process.env.NEXT_PUBLIC_STRIPE_LINK_HIGH}
+                className="block w-full border-2 border-purple-500 bg-purple-50 rounded-xl p-4 hover:bg-purple-100 transition-all text-left relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 bg-purple-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                  BEST VALUE
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-lg text-black">Super Grandma Pass</div>
+                    <div className="text-sm text-gray-500">80 Magic Videos</div>
+                  </div>
+                  <div className="font-bold text-xl text-black">$29.99</div>
+                </div>
+              </a>
+            </div>
+
+            <p className="text-center text-xs text-gray-400 mt-6">
+              Secure payment via Stripe. Credits added instantly.
+            </p>
           </div>
         </div>
       )}
