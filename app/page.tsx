@@ -89,7 +89,7 @@ export default function Home() {
             }
         } else {
             if (!sessionUser?.email) {
-                await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 0 }]);
+                await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 1 }]);
             }
         }
       } catch (err: any) {
