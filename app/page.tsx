@@ -143,12 +143,12 @@ export default function Home() {
   const handleSwap = async () => {
     if (!selectedFile) return;
 
+    // 1. Check Permissions
     if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
         setPaywallReason('premium');
         setShowPaywall(true); 
         return;
     }
-
     const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
     if (!isAllowed) {
         setPaywallReason('free_limit');
@@ -160,19 +160,38 @@ export default function Home() {
     setErrorModal(null);
 
     try {
+      // 2. Upload Photo
       const filename = `${deviceId}-${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage.from('uploads').upload(filename, selectedFile);
-      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
+      
+      if (uploadError) {
+          throw { type: 'UPLOAD_FAIL', message: `Upload Failed: ${uploadError.message}` };
+      }
+
+      // 3. Call API
+      // DIAGNOSTIC: Log the URL we are sending
+      const sourceUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`;
+      console.log("🚀 Sending to API:", sourceUrl);
 
       const startRes = await fetch('/api/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
         body: JSON.stringify({ 
-            sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
+            sourceImage: sourceUrl,
             targetVideo: selectedTemplate.url 
         }),
       });
       
+      // DIAGNOSTIC: Catch 404/500 immediately
+      if (!startRes.ok) {
+          const text = await startRes.text(); // Read raw text in case it's HTML
+          console.error("🔥 API Error Raw:", text);
+          throw { 
+              type: 'SERVER_HICCUP', 
+              message: `API Error ${startRes.status}: ${text.substring(0, 50)}...` 
+          };
+      }
+
       const startData = await startRes.json();
       
       if (startRes.status === 402) {
@@ -185,19 +204,18 @@ export default function Home() {
           return;
       }
 
-      if (startRes.status === 400) throw { type: 'USER_ERROR' };
-      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
-      if (startRes.status === 429) throw { type: 'MELTDOWN' };
-      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
+      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error || "Unknown API Error" };
       
       const predictionId = startData.id;
 
+      // 4. Poll for Result
       while (true) {
         await new Promise(r => setTimeout(r, 3000));
         const checkRes = await fetch(`/api/swap?id=${predictionId}`);
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
+            // Success Logic
             if (!hasChristmasPass) {
                 if (credits > 0) {
                     setCredits(prev => prev - 1); 
@@ -214,19 +232,24 @@ export default function Home() {
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
             const errText = (checkData.error || '').toLowerCase();
             if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
-            throw { type: 'MELTDOWN' };
+            throw { type: 'MELTDOWN', message: `AI Failed: ${checkData.error}` };
         }
       }
     } catch (err: any) {
       console.error("Swap Error:", err);
       setIsLoading(false);
+      
+      // DIAGNOSTIC: Show the REAL error in the modal
+      const debugMessage = err.message || JSON.stringify(err);
+      
       let modal = {
           title: "🍪 The elves are on a cookie break!",
-          message: "Please come back in 10 minutes!",
+          message: `DEBUG ERROR: ${debugMessage}`, // <--- THIS WILL TELL US THE TRUTH
           btnText: "Refresh Page",
           btnColor: "bg-gray-500 text-white",
           action: () => window.location.reload()
       };
+      
       const type = err.type || 'MELTDOWN';
       if (type === 'USER_ERROR') {
           modal = {
