@@ -77,7 +77,7 @@ export default function Home() {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
             } else {
-                if (user.credits_remaining > 0) setCredits(user.credits_remaining);
+                if (user.remaining_credits > 0) setCredits(user.remaining_credits);
                 if (user.free_swap_used) {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true');
@@ -89,7 +89,7 @@ export default function Home() {
             }
         } else {
             if (!sessionUser?.email) {
-                await supabase.from('magic_users').insert([{ device_id: currentId, credits_remaining: 1 }]);
+                await supabase.from('magic_users').insert([{ device_id: currentId, remaining_credits: 1 }]);
             }
         }
       } catch (err: any) {
