@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js'; // Needed for Admin access
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
@@ -10,101 +11,110 @@ const replicate = new Replicate({
 
 export async function POST(request: Request) {
   try {
-    // 1. Setup Supabase Client (Modern SSR) 🛠️
-    // ⚠️ NEXT.JS 15 FIX: We must 'await' the cookies() call now.
     const cookieStore = await cookies();
 
+    // 1. Standard Client (For Logged In Users)
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
+          getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
+             try {
+               cookiesToSet.forEach(({ name, value, options }) =>
+                 cookieStore.set(name, value, options)
+               );
+             } catch {}
           },
         },
       }
     );
+
+    // 2. Admin Client (For Guests / Bypassing RLS) 🛡️
+    // We use this specifically to check Guest credits because RLS hides them from the standard client.
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!, // <--- MAKE SURE THIS IS IN .ENV.LOCAL
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
     
-    // 2. Identify the User
+    // 3. Identify the User
     const { data: { user } } = await supabase.auth.getUser();
 
-    // 3. THE CREDIT CHECK (Gatekeeper) 🛡️
+    // ============================================================
+    // 🛡️ GATEKEEPER LOGIC
+    // ============================================================
+
+    // SCENARIO A: Logged In User
     if (user) {
       const { data: creditResult, error: creditError } = await supabase.rpc('consume_credit', { 
         user_id: user.id 
       });
 
-      if (creditError) {
-        console.error('Credit transaction failed:', creditError);
-        return NextResponse.json({ error: 'Transaction failed' }, { status: 500 });
+      if (creditError || !creditResult.success) {
+        console.log('PAYWALL (User): 0 credits');
+        return NextResponse.json({ error: 'Insufficient credits', remaining: 0 }, { status: 402 }); 
       }
-
-      // 4. STOP if insufficient credits 🛑
-      if (!creditResult.success) {
-        console.log('PAYWALL TRIGGERED: User has 0 credits');
-        return NextResponse.json({ 
-          error: 'Insufficient credits', 
-          remaining: 0 
-        }, { status: 402 }); 
-      }
-      
-      console.log('CREDIT DEDUCTED. Remaining:', creditResult.remaining);
+      console.log('User Credit Deducted');
     } 
     
-    // --- GUEST HANDLING ---
+    // SCENARIO B: Guest (Device ID)
     else {
       const deviceId = request.headers.get('x-device-id');
       
-      if (deviceId) {
-        const { data: guestUser } = await supabase
+      if (!deviceId) {
+         return NextResponse.json({ error: 'No Device ID' }, { status: 401 });
+      }
+
+      // Use ADMIN client to find the guest row (Bypasses RLS)
+      const { data: guestUser } = await supabaseAdmin
+        .from('magic_users')
+        .select('remaining_credits, christmas_pass')
+        .eq('device_id', deviceId)
+        .maybeSingle();
+
+      // Check if they have credits
+      if (!guestUser || (guestUser.remaining_credits < 1 && !guestUser.christmas_pass)) {
+         console.log('PAYWALL (Guest): 0 credits');
+         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+
+      // Deduct Credit (Manually, since RPC might fail on non-UUID guests)
+      if (!guestUser.christmas_pass) {
+        const { error: updateError } = await supabaseAdmin
           .from('magic_users')
-          .select('remaining_credits, christmas_pass')
-          .eq('device_id', deviceId)
-          .single();
-
-        if (!guestUser || (guestUser.remaining_credits < 1 && !guestUser.christmas_pass)) {
-           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
-        }
-
-        if (!guestUser.christmas_pass) {
-          await supabase
-            .from('magic_users')
-            .update({ remaining_credits: (guestUser.remaining_credits || 0) - 1 })
-            .eq('device_id', deviceId);
+          .update({ remaining_credits: (guestUser.remaining_credits || 0) - 1 })
+          .eq('device_id', deviceId);
+          
+        if (updateError) {
+            console.error("Failed to deduct guest credit", updateError);
+            return NextResponse.json({ error: 'Transaction failed' }, { status: 500 });
         }
       }
+      console.log('Guest Credit Deducted');
     }
 
     // ============================================================
-    // 🟢 GREEN LIGHT
+    // 🟢 GREEN LIGHT: AI GENERATION
     // ============================================================
 
     const formData = await request.formData();
     const video = formData.get('video') as File;
     const face = formData.get('face') as File;
 
-    if (!video || !face) {
-      return NextResponse.json({ error: 'Missing files' }, { status: 400 });
-    }
+    if (!video || !face) return NextResponse.json({ error: 'Missing files' }, { status: 400 });
 
     const videoBuffer = await video.arrayBuffer();
     const faceBuffer = await face.arrayBuffer();
     const videoBase64 = `data:${video.type};base64,${Buffer.from(videoBuffer).toString('base64')}`;
     const faceBase64 = `data:${face.type};base64,${Buffer.from(faceBuffer).toString('base64')}`;
 
-    // 6. Call Replicate (Using the Long ID)
     const prediction = await replicate.predictions.create({
       version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
       input: {
