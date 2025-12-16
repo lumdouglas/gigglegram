@@ -64,8 +64,8 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        const lookupId = sessionUser?.email || currentId;
-        const lookupCol = sessionUser?.email ? 'email' : 'device_id';
+        const lookupId = sessionUser ? sessionUser.id : currentId;
+        const lookupCol = sessionUser ? 'id' : 'device_id';
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
