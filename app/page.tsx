@@ -323,10 +323,10 @@ export default function Home() {
                     // 🟢 CHANGED: Now a button so users can buy more even if they have credits
                     <button 
                         onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }} 
-                        className="bg-blue-100 text-blue-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm hover:bg-blue-200 transition-colors flex items-center gap-2 active:scale-95"
+                        className="bg-teal-100 text-teal-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm hover:bg-teal-200 transition-colors flex items-center gap-2 active:scale-95 border-2 border-teal-200"
                     >
-                        <span>🍪 {credits} Cookies Left</span>
-                        <span className="text-xs bg-white/60 text-blue-900 px-2 py-0.5 rounded-full font-bold">+ Add</span>
+                        <span>✨ {credits === 1 ? "1 Free Magic Video" : `${credits} Magic Videos`}</span>
+                        <span className="text-xs bg-white/60 text-teal-900 px-2 py-0.5 rounded-full font-bold">+ Add</span>
                     </button>
                 ) : !freeUsed ? (
                     <span className="bg-emerald-100 text-emerald-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm animate-pulse">🎁 1 Free Magic Gift</span>
