@@ -24,7 +24,7 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
   const [isInitializing, setIsInitializing] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
   
@@ -297,11 +297,14 @@ export default function Home() {
 
   const handleDownload = async () => {
       if (!resultVideoUrl) return;
-      setIsDownloading(true);
+      
+      setSaveStatus('saving'); // 1. Start hourglass
+      
       try {
         const response = await fetch(resultVideoUrl);
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
+        
         const link = document.createElement('a');
         link.href = blobUrl;
         link.download = `GiggleGram-${Date.now()}.mp4`;
@@ -309,10 +312,16 @@ export default function Home() {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
+
+        setSaveStatus('saved'); // 2. Show Success Green
+        
+        // 3. Reset after 3 seconds so they can save again if needed
+        setTimeout(() => setSaveStatus('idle'), 3000);
+
       } catch (err) {
-        alert("Saving failed. Try long-pressing the video!");
-      } finally {
-        setIsDownloading(false);
+        console.error("Download error:", err);
+        setSaveStatus('idle'); // Reset on failure
+        alert("Saving failed. You can right-click the video to save it!");
       }
   };
 
@@ -447,11 +456,27 @@ export default function Home() {
 
               </div>
 
-              {/* SHARE BUTTONS */}
+              {/* SHARE BUTTON (Primary) */}
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
                 🚀 {isSharing ? 'Opening...' : 'Send to Family'}
               </button>
-              <button onClick={handleDownload} disabled={isDownloading} className="block w-full mt-4 text-gray-500 underline text-sm text-center">⬇️ Save to phone</button>
+
+              {/* SAVE BUTTON (Secondary - Nana's Update) */}
+              <button 
+                onClick={handleDownload}
+                disabled={saveStatus !== 'idle'}
+                className={`
+                  w-full py-4 rounded-xl font-bold text-lg shadow-sm border-2 transition-all mt-3
+                  ${saveStatus === 'saved' 
+                    ? 'bg-green-100 border-green-500 text-green-800 scale-105' // SUCCESS POP
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' // DEFAULT
+                  }
+                `}
+              >
+                {saveStatus === 'idle' && "⬇️ Save to Photos"}
+                {saveStatus === 'saving' && "⏳ Saving..."}
+                {saveStatus === 'saved' && "✅ Saved to Photos!"}
+              </button>
               
               <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 text-center shadow-sm">
                 <p className="text-sm text-amber-900 font-bold mb-1">⚠️ Don&apos;t lose your magic!</p>
