@@ -215,7 +215,6 @@ export default function Home() {
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-            // Success Logic
             if (!hasChristmasPass) {
                 if (credits > 0) {
                     setCredits(prev => prev - 1); 
@@ -226,13 +225,16 @@ export default function Home() {
                 }
             }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            setResultVideoUrl(checkData.output);
+            
+            // FIX: Handle Array or String output from Replicate
+            let finalUrl = checkData.output;
+            if (Array.isArray(finalUrl)) {
+                finalUrl = finalUrl[0]; // Grab the first link if it's a list
+            }
+            
+            setResultVideoUrl(finalUrl); 
             setIsLoading(false);
             break;
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            const errText = (checkData.error || '').toLowerCase();
-            if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
-            throw { type: 'MELTDOWN', message: `AI Failed: ${checkData.error}` };
         }
       }
     } catch (err: any) {
