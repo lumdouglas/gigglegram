@@ -31,18 +31,14 @@ export async function GET(request: Request) {
 }
 
 // 2. POST: Start Magic
-export async function POST(request: Request) {
-  console.log("🟢 API HIT: /api/swap started"); // This proves the file exists!
+// Inside app/api/swap/route.ts
 
+export async function POST(request: Request) {
   const token = process.env.REPLICATE_API_TOKEN;
-  if (!token) {
-    console.error("❌ FATAL: REPLICATE_API_TOKEN is missing in .env.local");
-    return NextResponse.json({ error: 'Server Config Error: Missing AI Key' }, { status: 500 });
-  }
+  if (!token) return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
 
   const replicate = new Replicate({ auth: token });
 
-  // Initialize Admin Client
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!, 
@@ -54,8 +50,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json(); 
     const { sourceImage, targetVideo } = body;
-
-    console.log("📸 Received Request:", { deviceId, hasImage: !!sourceImage, hasVideo: !!targetVideo });
 
     if (!sourceImage || !targetVideo) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
@@ -69,7 +63,6 @@ export async function POST(request: Request) {
         .maybeSingle();
 
     if (!user || (user.remaining_credits < 1 && !user.christmas_pass)) {
-       console.log("⛔ PAYWALL BLOCKED:", deviceId);
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
@@ -82,22 +75,18 @@ export async function POST(request: Request) {
     }
 
     // --- CALL REPLICATE ---
-    // --- CALL REPLICATE (xrunda/hello) ---
     const prediction = await replicate.predictions.create({
       version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
       input: {
-        // 'source' is the Base Video (Template)
-        // 'target' is the Face Image (User Photo)
-        source: targetVideo, 
-        target: sourceImage  
+        source: targetVideo, // Corrected: Template
+        target: sourceImage  // Corrected: Face
       },
     });
 
-    console.log("🚀 AI STARTED:", prediction.id);
     return NextResponse.json({ success: true, id: prediction.id });
 
   } catch (error: any) {
-    console.error('🔥 CRITICAL ERROR:', error);
+    console.error('Swap Error:', error); // Keep standard error logging
     return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 });
   }
 }
