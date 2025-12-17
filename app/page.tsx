@@ -32,7 +32,8 @@ export default function Home() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [hasChristmasPass, setHasChristmasPass] = useState(false); 
-  const [credits, setCredits] = useState(0); 
+  const [credits, setCredits] = useState(0);
+  const [purchasedPacks, setPurchasedPacks] = useState(0); 
   const [freeUsed, setFreeUsed] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
@@ -81,13 +82,18 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
+        // DEFINITIONS (Restored)
         const lookupId = sessionUser ? sessionUser.id : currentId;
         const lookupCol = sessionUser ? 'id' : 'device_id';
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
+        // QUERY (Updated for purchased_packs)
         const { data: user } = await supabase
-            .from('magic_users').select('*').eq(lookupCol, lookupId!).maybeSingle();
+            .from('magic_users')
+            .select('*, purchased_packs') // <--- We fetch the new column here
+            .eq(lookupCol, lookupId!)
+            .maybeSingle();
 
         if (user) {
             if (user.christmas_pass) {
@@ -95,6 +101,10 @@ export default function Home() {
                 setFreeUsed(false); 
             } else {
                 if (user.remaining_credits > 0) setCredits(user.remaining_credits);
+                
+                // NEW: Load the pack count into state
+                if (user.purchased_packs) setPurchasedPacks(user.purchased_packs);
+
                 if (user.free_swap_used) {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true');
@@ -270,12 +280,22 @@ export default function Home() {
   const handleSmartShare = async () => {
     if (!resultVideoUrl) return;
     setIsSharing(true);
+    // 1. Log the share in the database (Simple Device ID check)
     if (deviceId) {
-        const { data } = await supabase.from('magic_users').select('shares_count').eq('device_id', deviceId).single();
+        const { data } = await supabase
+            .from('magic_users')
+            .select('shares_count')
+            .eq('device_id', deviceId)
+            .maybeSingle();
+            
         if (data) {
-             await supabase.from('magic_users').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
+             await supabase
+                .from('magic_users')
+                .update({ shares_count: (data.shares_count || 0) + 1 })
+                .eq('device_id', deviceId);
         }
     }
+    // 2. Perform the Share
     const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
     try {
         if (navigator.share) {
@@ -373,12 +393,47 @@ export default function Home() {
 
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
-            {TEMPLATES.map((t) => (
-                <button key={t.id} onClick={() => { if (t.isPremium && !hasChristmasPass && credits <= 0) { setPaywallReason('premium'); setShowPaywall(true); } else { setSelectedTemplate(t); } }} className={`flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center ${selectedTemplate.id === t.id ? 'border-yellow-400 scale-105 z-10' : 'border-transparent opacity-90'}`}>
-                    <img src={t.thumb} alt={t.name} className={`w-full h-full object-cover ${(t.isPremium && !hasChristmasPass && credits <= 0) ? 'grayscale opacity-80' : ''}`} />
-                    {(t.isPremium && !hasChristmasPass && credits <= 0) && <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs">🔒</div>}
-                </button>
-            ))}
+            {TEMPLATES.map((t) => {
+                // LOGIC UPDATE:
+                // Premium templates are UNLOCKED if:
+                // 1. User has Christmas Pass (VIP)
+                // 2. OR User has bought a pack (purchasedPacks > 0)
+                // 3. OR User has explicitly more than 1 credit (e.g. admin gift)
+                
+                // Therefore, they are LOCKED only if ALL of these are false:
+                const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
+                const isLocked = t.isPremium && !isPremiumUser;
+
+                return (
+                    <button 
+                        key={t.id} 
+                        onClick={() => { 
+                            if (isLocked) { 
+                                setPaywallReason('premium'); 
+                                setShowPaywall(true); 
+                            } else { 
+                                setSelectedTemplate(t); 
+                            } 
+                        }} 
+                        className={`
+                            flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center 
+                            ${selectedTemplate.id === t.id ? 'border-yellow-400 scale-105 z-10' : 'border-transparent opacity-90'}
+                        `}
+                    >
+                        <img 
+                            src={t.thumb} 
+                            alt={t.name} 
+                            className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
+                        />
+                        {/* THE LOCK ICON */}
+                        {isLocked && (
+                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs backdrop-blur-sm">
+                                🔒
+                            </div>
+                        )}
+                    </button>
+                );
+            })}
           </div>
 
           <div className="mb-8">
@@ -477,7 +532,7 @@ export default function Home() {
                 {saveStatus === 'saving' && "⏳ Saving..."}
                 {saveStatus === 'saved' && "✅ Saved to Photos!"}
               </button>
-              
+
               <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 text-center shadow-sm">
                 <p className="text-sm text-amber-900 font-bold mb-1">⚠️ Don&apos;t lose your magic!</p>
                 <p className="text-xs text-amber-800 leading-snug">To protect your privacy, we do not keep a copy.<br/><strong className="font-black">Send it to your family now to save it forever!</strong></p>
