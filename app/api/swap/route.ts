@@ -9,7 +9,6 @@ export async function GET(request: Request) {
 
   if (!predictionId) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
 
-  // Initialize Replicate INSIDE the function to prevent startup crashes
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) {
     console.error("❌ FATAL: REPLICATE_API_TOKEN is missing in .env.local");
@@ -31,8 +30,6 @@ export async function GET(request: Request) {
 }
 
 // 2. POST: Start Magic
-// Inside app/api/swap/route.ts
-
 export async function POST(request: Request) {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
@@ -55,10 +52,11 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
     }
 
-    // --- CHECK CREDITS ---
+    // --- CHECK CREDITS & HISTORY ---
     const { data: user } = await supabaseAdmin
         .from('magic_users')
-        .select('remaining_credits, christmas_pass')
+        // CRITICAL FIX: We must SELECT 'swap_count' to increment it
+        .select('remaining_credits, christmas_pass, swap_count') 
         .eq('device_id', deviceId)
         .maybeSingle();
 
@@ -66,27 +64,41 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // --- DEDUCT CREDIT ---
+    // --- PREPARE UPDATES (The "Transaction") ---
+    const updates: any = {
+        // FIX: Always increment swap_count (Analytics + Paywall Trigger)
+        swap_count: (user.swap_count || 0) + 1 
+    };
+
+    // Only deduct credit if they are NOT a VIP
     if (!user.christmas_pass) {
-        await supabaseAdmin
-            .from('magic_users')
-            .update({ remaining_credits: user.remaining_credits - 1 })
-            .eq('device_id', deviceId);
+        updates.remaining_credits = user.remaining_credits - 1;
+    }
+
+    // --- EXECUTE DB UPDATE ---
+    const { error: updateError } = await supabaseAdmin
+        .from('magic_users')
+        .update(updates)
+        .eq('device_id', deviceId);
+
+    if (updateError) {
+        console.error("DB Update Failed:", updateError);
+        return NextResponse.json({ error: 'Transaction Failed' }, { status: 500 });
     }
 
     // --- CALL REPLICATE ---
     const prediction = await replicate.predictions.create({
       version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
       input: {
-        source: targetVideo, // Corrected: Template
-        target: sourceImage  // Corrected: Face
+        source: targetVideo, 
+        target: sourceImage  
       },
     });
 
     return NextResponse.json({ success: true, id: prediction.id });
 
   } catch (error: any) {
-    console.error('Swap Error:', error); // Keep standard error logging
+    console.error('Swap Error:', error);
     return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 });
   }
 }

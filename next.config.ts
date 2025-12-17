@@ -1,26 +1,17 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  /* KEEP any existing config here (like images: {}, etc.) 
-     ONLY add or replace the async headers() block below.
-  */
+const nextConfig = {
+  // ... keep your other config (like images) here ...
 
   async headers() {
     return [
       {
-        source: '/:path*',
+        source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
-            // CRITICAL FIX: Added 'unsafe-eval' to script-src
-            // CRITICAL FIX: Added Supabase/Replicate domains to connect-src/img-src
-            value: `
-              default-src 'self'; 
-              script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com; 
-              style-src 'self' 'unsafe-inline'; 
-              img-src 'self' blob: data: https://*.supabase.co; 
-              connect-src 'self' https://*.supabase.co https://api.replicate.com;
-            `.replace(/\s{2,}/g, ' ').trim() // Cleans up newlines for the header
+            // This is the "VIP List" for your browser
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co https://replicate.delivery; media-src 'self' https://replicate.delivery; connect-src 'self' https://*.supabase.co https://api.replicate.com;",
           },
         ],
       },
@@ -28,4 +19,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
