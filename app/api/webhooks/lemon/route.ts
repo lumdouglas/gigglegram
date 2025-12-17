@@ -4,86 +4,106 @@ import crypto from 'crypto';
 
 export async function POST(request: Request) {
   try {
-    // 1. Validate the Request (Security)
-    const text = await request.text();
-    const hmac = crypto.createHmac('sha256', process.env.LEMONSQUEEZY_WEBHOOK_SECRET!);
-    const digest = Buffer.from(hmac.update(text).digest('hex'), 'utf8');
+    console.log("🔔 Webhook Received!");
+
+    // 1. READ RAW BODY (Needed for signature)
+    const rawBody = await request.text();
+    
+    // 2. CHECK SECRET
+    const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+    if (!secret) {
+        console.error("❌ CRITICAL: LEMONSQUEEZY_WEBHOOK_SECRET is missing in Vercel Env Vars!");
+        return NextResponse.json({ error: 'Server Config Missing' }, { status: 500 });
+    }
+
+    // 3. VERIFY SIGNATURE (Security)
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = Buffer.from(hmac.update(rawBody).digest('hex'), 'utf8');
     const signature = Buffer.from(request.headers.get('x-signature') || '', 'utf8');
 
     if (!crypto.timingSafeEqual(digest, signature)) {
+      console.error("❌ Signature Mismatch! check your Webhook Secret.");
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // 2. Parse the Data
-    const payload = JSON.parse(text);
-    const eventName = payload.meta.event_name;
-    const customData = payload.meta.custom_data; // This contains the 'device_id' we sent from page.tsx
-    const variantId = payload.data.attributes.variant_id; // Which product did they buy?
+    // 4. PARSE DATA
+    const payload = JSON.parse(rawBody);
+    const { meta, data } = payload;
+    const eventName = meta.event_name;
+    const customData = meta.custom_data;
+    const variantId = data.attributes.variant_id;
+    const totalPrice = data.attributes.total_price;
+    
+    console.log(`📦 Event: ${eventName}`);
+    console.log(`🆔 Variant ID: ${variantId}`);
+    console.log(`💰 Total Price: ${totalPrice}`);
+    console.log(`👤 Custom Data (Device ID):`, customData);
 
-    // 3. Only run on successful orders
-    if (eventName === 'order_created') {
-      const deviceId = customData?.device_id;
-      
-      if (!deviceId) {
-        console.error("❌ Webhook Error: No device_id found in custom_data");
+    if (eventName !== 'order_created') {
+        return NextResponse.json({ message: 'Ignored non-order event' });
+    }
+
+    // 5. CHECK DEVICE ID
+    const deviceId = customData?.device_id;
+    if (!deviceId) {
+        console.error("❌ MISSING DEVICE ID. Did you include checkout[custom][device_id] in the URL?");
         return NextResponse.json({ error: 'No User ID' }, { status: 400 });
-      }
+    }
 
-      // 4. Connect to Admin DB
-      const supabaseAdmin = createClient(
+    // 6. CONNECT TO DB
+    const supabaseAdmin = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
         { auth: { autoRefreshToken: false, persistSession: false } }
-      );
+    );
 
-      // 5. Get Current User Stats
-      const { data: user } = await supabaseAdmin
+    // 7. GET CURRENT USER
+    const { data: user, error: fetchError } = await supabaseAdmin
         .from('magic_users')
         .select('remaining_credits, purchased_packs')
         .eq('device_id', deviceId)
         .single();
+    
+    if (fetchError) {
+        console.error("❌ DB Fetch Error:", fetchError);
+        return NextResponse.json({ error: 'DB Error' }, { status: 500 });
+    }
 
-      const currentCredits = user?.remaining_credits || 0;
-      const currentPacks = user?.purchased_packs || 0;
+    const currentCredits = user?.remaining_credits || 0;
+    const currentPacks = user?.purchased_packs || 0;
 
-      // 6. APPLY LOGIC BASED ON PRODUCT
-      // You need to check your LemonSqueezy Dashboard for these exact Variant IDs
-      // For now, we will assume:
-      // Small Pack ($4.99) usually has a specific ID
-      // Big Pass ($29.99) usually has a different ID
-      
-      // OPTION A: The $29.99 "Super Grandma" Pass
-      // (Replace '12345' with your actual Variant ID for the $29.99 product)
-      if (variantId == 12345 || payload.data.attributes.total_price === 2999) {
-          await supabaseAdmin
+    console.log(`📊 Current State for ${deviceId}: Credits=${currentCredits}, Packs=${currentPacks}`);
+
+    // 8. UPDATE LOGIC (Using Price as Backup)
+    // $29.99 Pass
+    if (totalPrice == 2999) { 
+        console.log("🚀 PROCESSING: VIP PASS");
+        await supabaseAdmin
             .from('magic_users')
-            .update({ 
-                christmas_pass: true, 
-                free_swap_used: false 
-            })
+            .update({ christmas_pass: true, free_swap_used: false })
             .eq('device_id', deviceId);
-          console.log(`✅ UPGRADED ${deviceId} to VIP`);
-      } 
-      
-      // OPTION B: The $4.99 "10 Magic Videos" Pack
-      // (Replace '67890' with actual ID, or rely on price check)
-      else if (variantId == 67890 || payload.data.attributes.total_price === 499) {
-          await supabaseAdmin
+    } 
+    // $4.99 Pack
+    else if (totalPrice == 499) { 
+        console.log("🚀 PROCESSING: 10 CREDIT PACK");
+        const { error: updateError } = await supabaseAdmin
             .from('magic_users')
             .update({ 
                 remaining_credits: currentCredits + 10,
-                purchased_packs: currentPacks + 1 // <--- THIS IS THE FIX
+                purchased_packs: currentPacks + 1 
             })
             .eq('device_id', deviceId);
-          console.log(`✅ ADDED 10 Credits to ${deviceId}`);
-      }
-
+            
+        if (updateError) console.error("❌ Update Failed:", updateError);
+        else console.log("✅ Update Success!");
+    } else {
+        console.warn(`⚠️ Unknown Price Point: ${totalPrice}. No action taken.`);
     }
 
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ success: true });
 
   } catch (err: any) {
-    console.error("Webhook Failed:", err.message);
+    console.error("💥 Webhook Crash:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
