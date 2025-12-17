@@ -82,9 +82,15 @@ export async function POST(request: Request) {
     }
 
     // --- CALL REPLICATE ---
+    // --- CALL REPLICATE (xrunda/hello) ---
     const prediction = await replicate.predictions.create({
       version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
-      input: { source: sourceImage, target: targetVideo },
+      input: {
+        // 'source' is the Base Video (Template)
+        // 'target' is the Face Image (User Photo)
+        source: targetVideo, 
+        target: sourceImage  
+      },
     });
 
     console.log("🚀 AI STARTED:", prediction.id);
