@@ -366,7 +366,9 @@ export default function Home() {
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
         
         {hasChristmasPass && (
-            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce">✨ Christmas VIP Pass Active</div>
+          <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce w-fit mx-auto">
+            ✨ Christmas VIP Pass Active
+          </div>
         )}
 
         {/* CREDIT DISPLAY LOGIC */}
