@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid'; 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -37,7 +37,24 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
   const [paywallReason, setPaywallReason] = useState('pass'); 
-  
+  // NEW: Silent Disco Logic
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      // 1. Flip the mute switch
+      const nextState = !videoRef.current.muted;
+      videoRef.current.muted = nextState;
+      setIsMuted(nextState);
+      
+      // 2. If turning ON sound, restart video so she hears the start
+      if (!nextState) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play(); // Force play just in case
+      }
+    }
+  };
   // UI
   const [errorModal, setErrorModal] = useState<any>(null);
 
@@ -396,9 +413,41 @@ export default function Home() {
 
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
-              <div className="relative rounded-2xl shadow-2xl overflow-hidden aspect-square bg-black">
-                <video src={`${resultVideoUrl}?t=${Date.now()}`} controls autoPlay loop playsInline className="w-full h-full object-cover" />
+              
+              {/* THE SILENT DISCO PLAYER */}
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl aspect-square bg-black group">
+                
+                <video 
+                  ref={videoRef}
+                  src={`${resultVideoUrl}?t=${Date.now()}`} 
+                  poster={selectedTemplate.thumb} // Nice fallback while loading
+                  autoPlay 
+                  loop 
+                  muted={isMuted} // Controlled by React state
+                  playsInline 
+                  onClick={toggleMute} // Tapping anywhere toggles sound
+                  className="w-full h-full object-cover cursor-pointer" 
+                />
+
+                {/* THE "NANA" BUTTON (Only visible when silent) */}
+                {isMuted && (
+                  <button 
+                    onClick={toggleMute}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 text-teal-900 px-6 py-3 rounded-full font-black shadow-[0_0_20px_rgba(0,0,0,0.3)] flex items-center gap-2 animate-bounce z-20 backdrop-blur-md border-4 border-teal-500 hover:scale-110 transition-transform"
+                  >
+                    <span className="text-2xl">🔊</span>
+                    <span className="text-lg">Tap for Music!</span>
+                  </button>
+                )}
+                
+                {/* Volume Indicator (Top Right) */}
+                <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold pointer-events-none">
+                  {isMuted ? '🔇 Muted' : '🔊 Sound On'}
+                </div>
+
               </div>
+
+              {/* SHARE BUTTONS */}
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
                 🚀 {isSharing ? 'Opening...' : 'Send to Family'}
               </button>
