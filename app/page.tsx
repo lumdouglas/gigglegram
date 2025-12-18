@@ -97,6 +97,11 @@ export default function Home() {
             .maybeSingle();
 
         if (user) {
+            // FIX 1: Load the Saved Email (Even if not logged in via Auth)
+            if (!sessionUser?.email && user.email) {
+                setUserEmail(user.email);
+            }
+
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
