@@ -148,44 +148,53 @@ export default function Home() {
     };
   // --- EFFECTS ---
 
+  // --- EFFECTS ---
+
   useEffect(() => {
-    // 1. DEFINE THE INIT LOGIC
     const initSession = async () => {
       try {
-        // A. Check for existing session
+        // 1. Check for existing session
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         
         let activeSession = existingSession;
 
-        // B. If no session, CREATE ANONYMOUS USER (Invisible Login)
+        // 2. If no session, CREATE ANONYMOUS USER (Invisible Login)
         if (!activeSession) {
             console.log("👻 No session found. creating anonymous ghost...");
             const { data, error } = await supabase.auth.signInAnonymously();
-            if (error) throw error;
+            
+            // IF THIS FAILS, WE MUST HANDLE IT
+            if (error) {
+                console.error("Ghost Login Failed:", error);
+                // Fallback: Just let the app load as "Guest" without auth if needed
+                // or throw to hit the catch block
+                throw error;
+            }
             activeSession = data.session;
         }
 
         setSession(activeSession);
         
-        // C. DEVICE ID & FINGERPRINTING (Keep existing logic)
-        // ... [Insert your existing FingerprintJS & uuidv4 logic here] ...
-        
-        // D. SYNC USER DATA (Credits/Pass)
+        // 3. SYNC USER DATA
         if (activeSession?.user) {
-            // [KEEP] Your existing 'fetchProfile' or 'checkUser' logic here.
-            // Ensure you query by 'id' (user.id) now, since we have a real Auth ID.
-            await checkUser(activeSession.user); 
+            // This handles setIsInitializing(false) internally
+            await checkUser(activeSession.user);
+        } else {
+            // Safety: If we have no user, stop loading
+            setIsInitializing(false);
         }
 
       } catch (err) {
         console.error("Auth Init Failed:", err);
+        // 🔴 CRITICAL FIX: Turn off loading so the user can at least see the UI
+        setIsInitializing(false);
       }
     };
 
-    // 2. RUN ON MOUNT
+    // RUN ON MOUNT
     initSession();
 
-    // 3. LISTEN FOR CHANGES (Merge / Upgrade)
+    // LISTEN FOR CHANGES
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setSession(session);
