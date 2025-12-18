@@ -112,7 +112,7 @@ export default function Home() {
         // 4. LOAD USER DATA
         if (user) {
             if (user.email) setUserEmail(user.email);
-            
+
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
@@ -407,9 +407,10 @@ export default function Home() {
             await navigator.share({
                 files: [file],
                 title: "My GiggleGram Magic! ✨",
-                text: "I made a little magic! ✨ Check this out! Try it at MyGiggleGram.com"
+                // EXACT COPY FROM V3 SPEC:
+                text: "I made a little magic with my grandbaby's photo! ✨👶\n\n👇 Try it here:\nhttps://MyGiggleGram.com"
             });
-        } 
+        }
         // 4. DESKTOP FALLBACK
         else {
             const a = document.createElement('a');
@@ -572,8 +573,25 @@ export default function Home() {
 
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Powered by AI Magic. Photo deleted immediately.</span></div>
 
-          <button onClick={handleSwap} disabled={!selectedFile || isLoading || isInitializing} className={`w-full py-6 rounded-2xl text-2xl font-black shadow-xl transition-all ${(!selectedFile || isInitializing) ? 'bg-gray-300' : isLoading ? 'bg-pink-500 animate-pulse' : 'bg-[#25D366] active:scale-95 text-white'}`}>
-             {isLoading ? loadingMessage : isInitializing ? 'Loading...' : !selectedFile ? 'Select a Photo Above 👆' : 'Make the Magic! ✨'}
+          <button 
+            onClick={handleSwap} 
+            disabled={!selectedFile || isLoading || isInitializing} 
+            className={`w-full py-6 rounded-2xl text-2xl font-black shadow-xl transition-all ${
+                (!selectedFile || isInitializing) 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // GRAY STATE
+                    : isLoading 
+                        ? 'bg-pink-500 animate-pulse text-white' 
+                        : 'bg-teal-600 active:scale-95 text-white hover:bg-teal-700' // TEAL STATE
+            }`}
+          >
+             {/* COPY PATCH: Explicit Instruction */}
+             {isLoading 
+                ? loadingMessage 
+                : isInitializing 
+                    ? 'Loading...' 
+                    : !selectedFile 
+                        ? 'Select a Photo First 👆' 
+                        : 'Make the Magic! ✨'}
           </button>
 
           {errorModal && (
