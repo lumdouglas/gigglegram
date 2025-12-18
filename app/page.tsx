@@ -64,6 +64,8 @@ export default function Home() {
   const [errorModal, setErrorModal] = useState<any>(null);
 
   // --- EFFECTS ---
+  // --- EFFECTS ---
+
   useEffect(() => {
     const checkUser = async (sessionUser: any = null) => {
       try {
@@ -75,39 +77,40 @@ export default function Home() {
 
         const { data: { session } } = await supabase.auth.getSession();
         
+        // 1. DEVICE ID SETUP
         let currentId = localStorage.getItem('giggle_device_id');
         if (!currentId) {
             currentId = uuidv4();
             localStorage.setItem('giggle_device_id', currentId!);
         }
         setDeviceId(currentId);
-
+        
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        // 1. SET EMAIL STATE
-        if (sessionUser?.email) setUserEmail(sessionUser.email);
+        // 2. STRICT AUTH STATE (Fixes the Logout Bug)
+        // We only show the "Logged In" UI if there is an active Supabase Session
+        if (sessionUser?.email) {
+            setUserEmail(sessionUser.email);
+        } else {
+            setUserEmail(null); 
+        }
 
-        // 2. BUILD THE QUERY (Priority: Email -> Device ID)
+        // 3. SMART QUERY (Fixes the Credits Bug)
+        // If logged in -> Find user by Email (syncs credits across devices)
+        // If guest -> Find user by Device ID
         let query = supabase.from('magic_users').select('*, purchased_packs');
 
         if (sessionUser?.email) {
-            // ✅ CORRECTION: If logged in, search by EMAIL, not the Auth ID.
-            // This connects the Auth User to the "Pre-Login" purchase row.
             query = query.eq('email', sessionUser.email);
         } else {
-            // Otherwise, use the Device ID
             query = query.eq('device_id', currentId!);
         }
 
         const { data: user } = await query.maybeSingle();
 
+        // 4. LOAD USER DATA
         if (user) {
-            // FIX 1: Load the Saved Email (Even if not logged in via Auth)
-            if (!sessionUser?.email && user.email) {
-                setUserEmail(user.email);
-            }
-
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
@@ -120,11 +123,13 @@ export default function Home() {
                     localStorage.setItem('giggle_free_used', 'true');
                 }
             }
+            // If logged in, ensure we track their Device ID for the future
             if (sessionUser?.email && user.device_id) {
                 setDeviceId(user.device_id);
                 localStorage.setItem('giggle_device_id', user.device_id);
             }
         } else {
+            // New User Creation (Guest Mode)
             if (!sessionUser?.email) {
                 await supabase.from('magic_users').insert([{ device_id: currentId, remaining_credits: 1 }]);
             }
@@ -136,14 +141,19 @@ export default function Home() {
       }
     };
 
+    // Trigger on Load
     supabase.auth.getSession().then(({ data: { session } }) => {
         checkUser(session?.user);
     });
 
+    // Trigger on Login/Logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
             setIsInitializing(true);
             checkUser(session.user);
+        } else if (event === 'SIGNED_OUT') {
+            setIsInitializing(true);
+            checkUser(null); // Force checkUser to run as "Guest"
         }
     });
 
