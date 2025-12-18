@@ -135,9 +135,26 @@ export default function Home() {
             }
         } else {
             // New User Creation (Guest Mode)
-            // Only create if we are TRULY anonymous (no email) to avoid dupes
             if (!sessionUser?.email) {
-                await supabase.from('magic_users').insert([{ device_id: currentId, remaining_credits: 1 }]);
+                // 1. CREATE THE DB ROW
+                const { error: insertError } = await supabase
+                    .from('magic_users')
+                    .insert([{ 
+                        device_id: currentId, 
+                        remaining_credits: 1, // The Database gets it
+                        swap_count: 0
+                    }]);
+
+                if (!insertError) {
+                    // 2. 🔴 CRITICAL FIX: UPDATE THE UI INSTANTLY
+                    setCredits(1);       // Give the user their credit visually
+                    setFreeUsed(false);  // Ensure they are marked as "Fresh"
+                    setPurchasedPacks(0);
+                    setHasChristmasPass(false);
+                    
+                    // 3. Clear any "poisoned" local storage from previous tests
+                    localStorage.removeItem('giggle_free_used'); 
+                }
             }
         }
       } catch (err: any) {
