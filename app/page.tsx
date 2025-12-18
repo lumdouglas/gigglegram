@@ -182,32 +182,46 @@ export default function Home() {
 
   // NEW: Save Email & Trigger Logic
   const saveEmailAndBuy = async () => {
+    // VALIDATION
     if (!emailInput.includes('@')) {
         alert("Please enter a valid email address.");
         return;
     }
 
-    // 1. Save Text Email (For LemonSqueezy Support)
+    // 1. SAVE "TEXT" EMAIL TO DATABASE
     if (deviceId) {
-        await supabase
+        const { error } = await supabase
             .from('magic_users')
             .update({ email: emailInput }) 
             .eq('device_id', deviceId);
+            
+        // NEW: HANDLE DUPLICATE EMAIL
+        if (error) {
+            // Error 23505 means "Email already exists"
+            if (error.code === '23505') {
+                 console.log("👋 Returning user detected (Email already in DB)");
+                 // We proceed! We don't save the email to *this* device row (to keep DB clean),
+                 // but we still let her pay and get credits on this device.
+            } else {
+                 console.error("Email save failed:", error);
+            }
+        }
     }
 
-    // 2. Trigger Magic Link (Shadow Sign-up)
+    // 2. TRIGGER MAGIC LINK (Shadow Sign-up)
+    // We attempt to send the link. If it's a new device, this lets her merge later.
     const { error: authError } = await supabase.auth.signInWithOtp({
         email: emailInput,
         options: {
             emailRedirectTo: window.location.origin, 
         }
     });
-    if (authError) console.error("Auth Error:", authError);
 
-    // 3. Update State & Go
+    // 3. UPDATE STATE & GO
     setUserEmail(emailInput);
     setShowEmailModal(false);
 
+    // 4. CHECKOUT
     const finalUrl = `${pendingBuyUrl}&checkout[email]=${encodeURIComponent(emailInput)}`;
     window.open(finalUrl, '_blank');
   };
