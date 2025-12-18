@@ -27,6 +27,7 @@ export default function Home() {
   const [saveStatus, setSaveStatus] = useState('idle'); 
   const [isInitializing, setIsInitializing] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
+  const [session, setSession] = useState<any>(null);
   
   // MONETIZATION
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -64,19 +65,9 @@ export default function Home() {
   const [errorModal, setErrorModal] = useState<any>(null);
 
   // --- EFFECTS ---
-  // --- EFFECTS ---
-
-  useEffect(() => {
-    const checkUser = async (sessionUser: any = null) => {
+  // --- HELPER: USER SYNC LOGIC ---
+  const checkUser = async (sessionUser: any = null) => {
       try {
-        try {
-            const fp = await FingerprintJS.load();
-            const result = await fp.get();
-            setFingerprint(result.visitorId);
-        } catch (e) { console.warn("FP failed"); }
-
-        const { data: { session } } = await supabase.auth.getSession();
-        
         // 1. DEVICE ID SETUP
         let currentId = localStorage.getItem('giggle_device_id');
         if (!currentId) {
@@ -88,17 +79,14 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        // 2. STRICT AUTH STATE (Fixes the Logout Bug)
-        // We only show the "Logged In" UI if there is an active Supabase Session
+        // 2. SET EMAIL STATE
         if (sessionUser?.email) {
             setUserEmail(sessionUser.email);
         } else {
             setUserEmail(null); 
         }
 
-        // 3. SMART QUERY (Fixes the Credits Bug)
-        // If logged in -> Find user by Email (syncs credits across devices)
-        // If guest -> Find user by Device ID
+        // 3. SMART QUERY (Find User by Email OR Device ID)
         let query = supabase.from('magic_users').select('*, purchased_packs');
 
         if (sessionUser?.email) {
@@ -107,12 +95,27 @@ export default function Home() {
             query = query.eq('device_id', currentId!);
         }
 
-        const { data: user } = await query.maybeSingle();
+        // [MODIFIED] Use 'let' for the race condition fix
+        let { data: user } = await query.maybeSingle();
+
+        // ---------------------------------------------------------
+        // 🏎️ RACE CONDITION FIX: THE DOUBLE TAP
+        // If a new user shows 0 credits, wait 1s and check again.
+        // ---------------------------------------------------------
+        if (user && (user.remaining_credits === 0 || user.remaining_credits === null) && (user.swap_count === 0 || user.swap_count === null)) {
+             console.log("🏎️ Potential race condition. Retrying fetch in 1000ms...");
+             await new Promise(resolve => setTimeout(resolve, 1000));
+             const { data: retryUser } = await query.maybeSingle();
+             if (retryUser) {
+                 user = retryUser; 
+             }
+        }
+        // ---------------------------------------------------------
 
         // 4. LOAD USER DATA
         if (user) {
             if (user.email) setUserEmail(user.email);
-
+            
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
@@ -125,13 +128,14 @@ export default function Home() {
                     localStorage.setItem('giggle_free_used', 'true');
                 }
             }
-            // If logged in, ensure we track their Device ID for the future
+            // Sync Device ID if we found a user
             if (sessionUser?.email && user.device_id) {
                 setDeviceId(user.device_id);
                 localStorage.setItem('giggle_device_id', user.device_id);
             }
         } else {
             // New User Creation (Guest Mode)
+            // Only create if we are TRULY anonymous (no email) to avoid dupes
             if (!sessionUser?.email) {
                 await supabase.from('magic_users').insert([{ device_id: currentId, remaining_credits: 1 }]);
             }
@@ -142,21 +146,51 @@ export default function Home() {
           setIsInitializing(false);
       }
     };
+  // --- EFFECTS ---
 
-    // Trigger on Load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        checkUser(session?.user);
-    });
+  useEffect(() => {
+    // 1. DEFINE THE INIT LOGIC
+    const initSession = async () => {
+      try {
+        // A. Check for existing session
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        let activeSession = existingSession;
 
-    // Trigger on Login/Logout
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-            setIsInitializing(true);
-            checkUser(session.user);
-        } else if (event === 'SIGNED_OUT') {
-            setIsInitializing(true);
-            checkUser(null); // Force checkUser to run as "Guest"
+        // B. If no session, CREATE ANONYMOUS USER (Invisible Login)
+        if (!activeSession) {
+            console.log("👻 No session found. creating anonymous ghost...");
+            const { data, error } = await supabase.auth.signInAnonymously();
+            if (error) throw error;
+            activeSession = data.session;
         }
+
+        setSession(activeSession);
+        
+        // C. DEVICE ID & FINGERPRINTING (Keep existing logic)
+        // ... [Insert your existing FingerprintJS & uuidv4 logic here] ...
+        
+        // D. SYNC USER DATA (Credits/Pass)
+        if (activeSession?.user) {
+            // [KEEP] Your existing 'fetchProfile' or 'checkUser' logic here.
+            // Ensure you query by 'id' (user.id) now, since we have a real Auth ID.
+            await checkUser(activeSession.user); 
+        }
+
+      } catch (err) {
+        console.error("Auth Init Failed:", err);
+      }
+    };
+
+    // 2. RUN ON MOUNT
+    initSession();
+
+    // 3. LISTEN FOR CHANGES (Merge / Upgrade)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+        checkUser(session?.user);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -479,6 +513,7 @@ export default function Home() {
 
   // --- RENDER ---
 
+  // REPLACE THE ENTIRE 'return' STATEMENT WITH THIS:
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative pb-20">
       
@@ -497,6 +532,7 @@ export default function Home() {
       <div className="max-w-md mx-auto pt-8">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
         
+        {/* GOLDEN BADGE (Revenue Goal) */}
         {hasChristmasPass && (
           <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce w-fit mx-auto">
             ✨ Christmas VIP Pass Active
@@ -524,6 +560,7 @@ export default function Home() {
             </div>
         )}
 
+        {/* TEMPLATE GRID (The Product) */}
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
             {TEMPLATES.map((t) => {
@@ -559,6 +596,7 @@ export default function Home() {
             })}
           </div>
 
+          {/* PHOTO UPLOAD (The Input) */}
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
@@ -584,18 +622,18 @@ export default function Home() {
 
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Powered by AI Magic. Photo deleted immediately.</span></div>
 
+          {/* MAIN ACTION BUTTON (Compliance: Gray/Teal State Logic) */}
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading || isInitializing} 
             className={`w-full py-6 rounded-2xl text-2xl font-black shadow-xl transition-all ${
                 (!selectedFile || isInitializing) 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' // GRAY STATE
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                     : isLoading 
                         ? 'bg-pink-500 animate-pulse text-white' 
-                        : 'bg-teal-600 active:scale-95 text-white hover:bg-teal-700' // TEAL STATE
+                        : 'bg-teal-600 active:scale-95 text-white hover:bg-teal-700'
             }`}
           >
-             {/* COPY PATCH: Explicit Instruction */}
              {isLoading 
                 ? loadingMessage 
                 : isInitializing 
@@ -605,6 +643,7 @@ export default function Home() {
                         : 'Make the Magic! ✨'}
           </button>
 
+          {/* ERROR MODAL (Sad Path) */}
           {errorModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
                 <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
@@ -615,6 +654,7 @@ export default function Home() {
             </div>
           )}
 
+          {/* RESULT VIDEO & SHARE (The Viral Loop) */}
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl aspect-square bg-black group">
@@ -672,6 +712,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* PAYWALL MODAL (Compliance: Grey Anchor / Pulse Target) */}
       {showPaywall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative p-6">
@@ -679,21 +720,29 @@ export default function Home() {
              <div className="text-center mb-6"><div className="text-5xl mb-2">🎄</div><h3 className="text-xl font-bold text-black text-center mb-2">Woah! You loved that one?</h3><p className="text-gray-500">Choose a pass to keep going!</p></div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* NEW: Button uses handleSafeBuy instead of plain link */}
+                {/* CARD 1: THE ANCHOR (Boring Grey) */}
                 <button 
                     onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`)} 
-                    className="border-2 border-gray-200 rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white text-center block w-full"
+                    className="border-2 border-gray-200 rounded-2xl p-4 active:scale-95 transition-all bg-white text-center block w-full"
                 >
-                    <h4 className="font-bold text-lg text-black">🍪 10 Magic Videos</h4><div className="font-bold text-xl text-black">$4.99</div><div className="mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl">Get 10 Videos</div>
+                    <h4 className="font-bold text-lg text-gray-700">🍪 10 Magic Videos</h4>
+                    <div className="font-bold text-xl text-gray-900">$4.99</div>
+                    <div className="mt-4 w-full py-4 rounded-xl font-bold bg-gray-200 text-gray-900 hover:bg-gray-300 transition-all">
+                        Get 10 Videos
+                    </div>
                 </button>
                 
-                {/* NEW: Button uses handleSafeBuy instead of plain link */}
+                {/* CARD 2: THE TARGET (Pulsing Teal) */}
                 <button 
                     onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`)} 
-                    className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block w-full"
+                    className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block w-full shadow-lg transform scale-105"
                 >
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-xs font-black px-3 py-1 rounded-full">BEST VALUE</div>
-                    <h4 className="font-bold text-lg text-black">🎅 Super Grandma Pass</h4><div className="font-bold text-xl text-black">$29.99</div><div className="mt-4 bg-[#25D366] text-white font-black py-3 rounded-xl animate-pulse">Get Unlimited Magic</div>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">BEST VALUE</div>
+                    <h4 className="font-bold text-lg text-black">🎅 Super Grandma Pass</h4>
+                    <div className="font-bold text-xl text-teal-700">$29.99</div>
+                    <div className="mt-4 w-full bg-teal-600 text-white font-black py-4 rounded-xl animate-pulse shadow-xl ring-4 ring-teal-100">
+                        Get Unlimited Magic
+                    </div>
                 </button>
 
              </div>
@@ -702,7 +751,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* NEW: EMAIL CAPTURE MODAL */}
+      {/* EMAIL CAPTURE MODAL (The Bridge) */}
       {showEmailModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-300">
