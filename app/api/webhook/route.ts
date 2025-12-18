@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 export async function POST(request: Request) {
+  console.log("🟢 WEBHOOK VERSION: 2.0 (PACKS FIX)");  
+  
   try {
     // 1. SETUP & SECURITY
     const text = await request.text();
