@@ -7,14 +7,14 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import TEMPLATES from '@/config/templates.json'; 
 
 const LOADING_MESSAGES = [
-  "Connecting to the North Pole... 📡",                  // 0s
-  "The elves are finding the magic dust... ✨",          // 6s
-  "Santa is checking the list (twice!)... 📜",           // 12s
-  "Oh my goodness, the cuteness levels are HIGH! 👶",    // 18s
-  "Sprinkling extra holiday cheer... 🎄",                // 24s
-  "Almost there! Wrapping it up... 🎁",                  // 30s
-  "The reindeer are landing... 🦌",                      // 36s
-  "HERE IT IS! ✨"                                       // 42s
+  "Connecting to the North Pole... 📡",                  
+  "The elves are finding the magic dust... ✨",          
+  "Santa is checking the list (twice!)... 📜",           
+  "Oh my goodness, the cuteness levels are HIGH! 👶",    
+  "Sprinkling extra holiday cheer... 🎄",                
+  "Almost there! Wrapping it up... 🎁",                  
+  "The reindeer are landing... 🦌",                      
+  "HERE IT IS! ✨"                                       
 ];
 
 export default function Home() {
@@ -24,7 +24,7 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]); 
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState('idle'); 
   const [isInitializing, setIsInitializing] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
   
@@ -38,29 +38,32 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null); 
   const [paywallReason, setPaywallReason] = useState('pass'); 
-  // NEW: Silent Disco Logic
+  
+  // NEW: Email Capture State
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingBuyUrl, setPendingBuyUrl] = useState(''); 
+  const [emailInput, setEmailInput] = useState('');
+
+  // Silent Disco Logic
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const toggleMute = () => {
     if (videoRef.current) {
-      // 1. Flip the mute switch
       const nextState = !videoRef.current.muted;
       videoRef.current.muted = nextState;
       setIsMuted(nextState);
-      
-      // 2. If turning ON sound, restart video so she hears the start
       if (!nextState) {
         videoRef.current.currentTime = 0;
-        videoRef.current.play(); // Force play just in case
+        videoRef.current.play(); 
       }
     }
   };
+
   // UI
   const [errorModal, setErrorModal] = useState<any>(null);
 
   // --- EFFECTS ---
-
   useEffect(() => {
     const checkUser = async (sessionUser: any = null) => {
       try {
@@ -82,16 +85,14 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        // DEFINITIONS (Restored)
         const lookupId = sessionUser ? sessionUser.id : currentId;
         const lookupCol = sessionUser ? 'id' : 'device_id';
 
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        // QUERY (Updated for purchased_packs)
         const { data: user } = await supabase
             .from('magic_users')
-            .select('*, purchased_packs') // <--- We fetch the new column here
+            .select('*, purchased_packs') 
             .eq(lookupCol, lookupId!)
             .maybeSingle();
 
@@ -101,8 +102,6 @@ export default function Home() {
                 setFreeUsed(false); 
             } else {
                 if (user.remaining_credits > 0) setCredits(user.remaining_credits);
-                
-                // NEW: Load the pack count into state
                 if (user.purchased_packs) setPurchasedPacks(user.purchased_packs);
 
                 if (user.free_swap_used) {
@@ -167,7 +166,51 @@ export default function Home() {
     }
   };
 
-  // Inside app/page.tsx
+  // NEW: Secure Buy Handler
+  const handleSafeBuy = (buyUrl: string) => {
+    // 1. If we already know her email, let her pass
+    if (userEmail) {
+       const finalUrl = `${buyUrl}&checkout[email]=${encodeURIComponent(userEmail)}`;
+       window.open(finalUrl, '_blank');
+    } 
+    // 2. If no email, Stop! Show the modal.
+    else {
+       setPendingBuyUrl(buyUrl);
+       setShowEmailModal(true);
+    }
+  };
+
+  // NEW: Save Email & Trigger Logic
+  const saveEmailAndBuy = async () => {
+    if (!emailInput.includes('@')) {
+        alert("Please enter a valid email address.");
+        return;
+    }
+
+    // 1. Save Text Email (For LemonSqueezy Support)
+    if (deviceId) {
+        await supabase
+            .from('magic_users')
+            .update({ email: emailInput }) 
+            .eq('device_id', deviceId);
+    }
+
+    // 2. Trigger Magic Link (Shadow Sign-up)
+    const { error: authError } = await supabase.auth.signInWithOtp({
+        email: emailInput,
+        options: {
+            emailRedirectTo: window.location.origin, 
+        }
+    });
+    if (authError) console.error("Auth Error:", authError);
+
+    // 3. Update State & Go
+    setUserEmail(emailInput);
+    setShowEmailModal(false);
+
+    const finalUrl = `${pendingBuyUrl}&checkout[email]=${encodeURIComponent(emailInput)}`;
+    window.open(finalUrl, '_blank');
+  };
 
   const handleSwap = async () => {
     if (!selectedFile) return;
@@ -238,7 +281,6 @@ export default function Home() {
             }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
             
-            // Safe Array Check
             let finalUrl = checkData.output;
             if (Array.isArray(finalUrl)) {
                 finalUrl = finalUrl[0];
@@ -280,7 +322,6 @@ export default function Home() {
   const handleSmartShare = async () => {
     if (!resultVideoUrl) return;
     setIsSharing(true);
-    // 1. Log the share in the database (Simple Device ID check)
     if (deviceId) {
         const { data } = await supabase
             .from('magic_users')
@@ -295,7 +336,6 @@ export default function Home() {
                 .eq('device_id', deviceId);
         }
     }
-    // 2. Perform the Share
     const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
     try {
         if (navigator.share) {
@@ -317,14 +357,11 @@ export default function Home() {
 
   const handleDownload = async () => {
       if (!resultVideoUrl) return;
-      
-      setSaveStatus('saving'); // 1. Start hourglass
-      
+      setSaveStatus('saving'); 
       try {
         const response = await fetch(resultVideoUrl);
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        
         const link = document.createElement('a');
         link.href = blobUrl;
         link.download = `GiggleGram-${Date.now()}.mp4`;
@@ -333,14 +370,11 @@ export default function Home() {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
 
-        setSaveStatus('saved'); // 2. Show Success Green
-        
-        // 3. Reset after 3 seconds so they can save again if needed
+        setSaveStatus('saved'); 
         setTimeout(() => setSaveStatus('idle'), 3000);
-
       } catch (err) {
         console.error("Download error:", err);
-        setSaveStatus('idle'); // Reset on failure
+        setSaveStatus('idle'); 
         alert("Saving failed. You can right-click the video to save it!");
       }
   };
@@ -377,7 +411,6 @@ export default function Home() {
                 {isInitializing ? (
                     <span className="text-gray-400 text-sm font-bold flex items-center gap-2"><span className="animate-spin">⏳</span> Connecting...</span>
                 ) : credits > 0 ? (
-                    // 🟢 CHANGED: Now a button so users can buy more even if they have credits
                     <button 
                         onClick={() => { setPaywallReason('free_limit'); setShowPaywall(true); }} 
                         className="bg-teal-100 text-teal-800 text-lg font-bold px-6 py-2 rounded-full shadow-sm hover:bg-teal-200 transition-colors flex items-center gap-2 active:scale-95 border-2 border-teal-200"
@@ -396,13 +429,6 @@ export default function Home() {
         <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
           <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
             {TEMPLATES.map((t) => {
-                // LOGIC UPDATE:
-                // Premium templates are UNLOCKED if:
-                // 1. User has Christmas Pass (VIP)
-                // 2. OR User has bought a pack (purchasedPacks > 0)
-                // 3. OR User has explicitly more than 1 credit (e.g. admin gift)
-                
-                // Therefore, they are LOCKED only if ALL of these are false:
                 const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
                 const isLocked = t.isPremium && !isPremiumUser;
 
@@ -427,11 +453,8 @@ export default function Home() {
                             alt={t.name} 
                             className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
                         />
-                        {/* THE LOCK ICON */}
                         {isLocked && (
-                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs backdrop-blur-sm">
-                                🔒
-                            </div>
+                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs backdrop-blur-sm">🔒</div>
                         )}
                     </button>
                 );
@@ -479,23 +502,18 @@ export default function Home() {
 
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
-              
-              {/* THE SILENT DISCO PLAYER */}
               <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl aspect-square bg-black group">
-                
                 <video 
                   ref={videoRef}
                   src={`${resultVideoUrl}?t=${Date.now()}`} 
-                  poster={selectedTemplate.thumb} // Nice fallback while loading
+                  poster={selectedTemplate.thumb}
                   autoPlay 
                   loop 
-                  muted={isMuted} // Controlled by React state
+                  muted={isMuted} 
                   playsInline 
-                  onClick={toggleMute} // Tapping anywhere toggles sound
+                  onClick={toggleMute}
                   className="w-full h-full object-cover cursor-pointer" 
                 />
-
-                {/* THE "NANA" BUTTON (Only visible when silent) */}
                 {isMuted && (
                   <button 
                     onClick={toggleMute}
@@ -505,28 +523,23 @@ export default function Home() {
                     <span className="text-lg">Tap for Music!</span>
                   </button>
                 )}
-                
-                {/* Volume Indicator (Top Right) */}
                 <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold pointer-events-none">
                   {isMuted ? '🔇 Muted' : '🔊 Sound On'}
                 </div>
-
               </div>
 
-              {/* SHARE BUTTON (Primary) */}
               <button onClick={handleSmartShare} disabled={isSharing} className="block mt-6 w-full h-[80px] bg-[#25D366] text-white text-xl font-black text-center shadow-xl rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
                 🚀 {isSharing ? 'Opening...' : 'Send to Family'}
               </button>
 
-              {/* SAVE BUTTON (Secondary - Nana's Update) */}
               <button 
                 onClick={handleDownload}
                 disabled={saveStatus !== 'idle'}
                 className={`
                   w-full py-4 rounded-xl font-bold text-lg shadow-sm border-2 transition-all mt-3
                   ${saveStatus === 'saved' 
-                    ? 'bg-green-100 border-green-500 text-green-800 scale-105' // SUCCESS POP
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' // DEFAULT
+                    ? 'bg-green-100 border-green-500 text-green-800 scale-105' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' 
                   }
                 `}
               >
@@ -550,15 +563,63 @@ export default function Home() {
              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-2 bg-gray-200 rounded-full">✕</button>
              <div className="text-center mb-6"><div className="text-5xl mb-2">🎄</div><h3 className="text-xl font-bold text-black text-center mb-2">Woah! You loved that one?</h3><p className="text-gray-500">Choose a pass to keep going!</p></div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href={`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`} className="border-2 border-gray-200 rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white text-center block">
+                
+                {/* NEW: Button uses handleSafeBuy instead of plain link */}
+                <button 
+                    onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`)} 
+                    className="border-2 border-gray-200 rounded-2xl p-4 active:border-rose-500 active:scale-95 transition-all bg-white text-center block w-full"
+                >
                     <h4 className="font-bold text-lg text-black">🍪 10 Magic Videos</h4><div className="font-bold text-xl text-black">$4.99</div><div className="mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl">Get 10 Videos</div>
-                </a>
-                <a href={`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`} className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block">
+                </button>
+                
+                {/* NEW: Button uses handleSafeBuy instead of plain link */}
+                <button 
+                    onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`)} 
+                    className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block w-full"
+                >
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-xs font-black px-3 py-1 rounded-full">BEST VALUE</div>
                     <h4 className="font-bold text-lg text-black">🎅 Super Grandma Pass</h4><div className="font-bold text-xl text-black">$29.99</div><div className="mt-4 bg-[#25D366] text-white font-black py-3 rounded-xl animate-pulse">Get Unlimited Magic</div>
-                </a>
+                </button>
+
              </div>
              <div className="mt-6 text-center text-xs text-gray-400"><a href="/login" className="underline text-teal-600">Restore Purchase</a><br/>One-time payment. No subscription.</div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: EMAIL CAPTURE MODAL */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="text-center">
+              <div className="text-4xl mb-4">🛡️</div>
+              <h3 className="text-2xl font-black text-slate-900 mb-2">Wait! Don&apos;t lose it!</h3>
+              <p className="text-slate-600 mb-6 leading-snug">
+                Please enter your email so we can restore your credits if you ever lose your phone.
+              </p>
+              
+              <input 
+                type="email" 
+                placeholder="nana@example.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className="w-full text-lg p-4 bg-slate-50 border-2 border-slate-200 rounded-xl mb-4 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20 outline-none transition-all"
+              />
+
+              <button 
+                onClick={saveEmailAndBuy}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
+              >
+                Secure & Continue to Pay ➔
+              </button>
+              
+              <button 
+                onClick={() => setShowEmailModal(false)}
+                className="mt-4 text-slate-400 font-medium text-sm hover:text-slate-600"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
