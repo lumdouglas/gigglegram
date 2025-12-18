@@ -111,6 +111,8 @@ export default function Home() {
 
         // 4. LOAD USER DATA
         if (user) {
+            if (user.email) setUserEmail(user.email);
+            
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
@@ -176,7 +178,21 @@ export default function Home() {
   // --- HANDLERS ---
 
   const handleLogout = async () => {
+    // 1. Sign out of Supabase Auth
     await supabase.auth.signOut();
+    
+    // 2. GENERATE NEW DEVICE ID (Disconnect from the old "Credit-Rich" ID)
+    const newId = uuidv4();
+    localStorage.setItem('giggle_device_id', newId);
+    setDeviceId(newId);
+    
+    // 3. Clear State
+    setUserEmail(null);
+    setCredits(0);
+    setPurchasedPacks(0);
+    setHasChristmasPass(false);
+    
+    // 4. Reload to be clean
     window.location.reload();
   };
 
