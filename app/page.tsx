@@ -323,7 +323,18 @@ export default function Home() {
         if (checkData.status === 'succeeded') {
             if (!hasChristmasPass) {
                 if (credits > 0) {
-                    setCredits(prev => prev - 1); 
+                    // --- 🔴 CRITICAL MISSING LINK START ---
+                    // We must tell the SERVER the credit is gone. 
+                    // Without this, a browser cache clear restores the credit.
+                    if (deviceId) {
+                        await supabase
+                            .from('magic_users')
+                            .update({ remaining_credits: credits - 1 }) // Deduct from DB
+                            .eq('device_id', deviceId);
+                    }
+                    // --- 🔴 CRITICAL MISSING LINK END ---
+
+                    setCredits(prev => prev - 1); // Update Local State
                 } else {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true'); 
