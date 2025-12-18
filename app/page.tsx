@@ -85,16 +85,22 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        const lookupId = sessionUser ? sessionUser.id : currentId;
-        const lookupCol = sessionUser ? 'id' : 'device_id';
-
+        // 1. SET EMAIL STATE
         if (sessionUser?.email) setUserEmail(sessionUser.email);
 
-        const { data: user } = await supabase
-            .from('magic_users')
-            .select('*, purchased_packs') 
-            .eq(lookupCol, lookupId!)
-            .maybeSingle();
+        // 2. BUILD THE QUERY (Priority: Email -> Device ID)
+        let query = supabase.from('magic_users').select('*, purchased_packs');
+
+        if (sessionUser?.email) {
+            // ✅ CORRECTION: If logged in, search by EMAIL, not the Auth ID.
+            // This connects the Auth User to the "Pre-Login" purchase row.
+            query = query.eq('email', sessionUser.email);
+        } else {
+            // Otherwise, use the Device ID
+            query = query.eq('device_id', currentId!);
+        }
+
+        const { data: user } = await query.maybeSingle();
 
         if (user) {
             // FIX 1: Load the Saved Email (Even if not logged in via Auth)
@@ -338,37 +344,72 @@ export default function Home() {
     }
   };
 
+  // ... inside Home() ...
+
   const handleSmartShare = async () => {
     if (!resultVideoUrl) return;
     setIsSharing(true);
-    if (deviceId) {
-        const { data } = await supabase
-            .from('magic_users')
-            .select('shares_count')
-            .eq('device_id', deviceId)
-            .maybeSingle();
-            
-        if (data) {
-             await supabase
-                .from('magic_users')
-                .update({ shares_count: (data.shares_count || 0) + 1 })
-                .eq('device_id', deviceId);
-        }
-    }
-    const shareText = `I made a little magic! ✨\n\n👇 Watch it here:\n${resultVideoUrl}\n\nTry it at MyGiggleGram.com`;
+
     try {
-        if (navigator.share) {
-            const response = await fetch(resultVideoUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'magic.mp4', { type: 'video/mp4' });
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'My GiggleGram', text: shareText });
-                return; 
+        // 1. LOGGING
+        if (deviceId) {
+            const { data } = await supabase
+                .from('magic_users')
+                .select('shares_count')
+                .eq('device_id', deviceId)
+                .maybeSingle();
+                
+            if (data) {
+                 await supabase
+                    .from('magic_users')
+                    .update({ shares_count: (data.shares_count || 0) + 1 })
+                    .eq('device_id', deviceId);
             }
         }
-        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
+
+        // 2. THE BLOB MANEUVER
+        const response = await fetch(resultVideoUrl);
+        const blob = await response.blob();
+        
+        // REVISION: Universal Filename 
+        const fileName = "GiggleGram_Magic.mp4"; 
+        
+        const file = new File([blob], fileName, { type: "video/mp4" });
+
+        // 3. SHARE THE FILE
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: "My GiggleGram Magic! ✨",
+                text: "I made a little magic! ✨ Check this out! Try it at MyGiggleGram.com"
+            });
+        } 
+        // 4. DESKTOP FALLBACK
+        else {
+            const a = document.createElement('a');
+            a.href = window.URL.createObjectURL(blob);
+            a.download = fileName; // Uses the new universal name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            alert("✨ Magic saved to your Downloads folder!\n\nNow you can email it or upload it to Facebook.");
+        }
+
     } catch (err) {
-        window.open(`whatsapp://send?text=${encodeURIComponent(shareText)}`, '_blank');
+        console.error("Share failed:", err);
+        try {
+            const response = await fetch(resultVideoUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "GiggleGram_Magic.mp4"; // Universal Fallback
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            alert("Could not share. Please try the 'Save to Photos' button below!");
+        }
     } finally {
         setIsSharing(false);
     }
