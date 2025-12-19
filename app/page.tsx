@@ -86,30 +86,55 @@ export default function Home() {
             setUserEmail(null); 
         }
 
-        // 3. SMART QUERY (Find User by Email OR Device ID)
-        let query = supabase.from('magic_users').select('*, purchased_packs');
+        // 3. SMART QUERY (The "Merge" Logic)
+        let user = null;
 
+        // PATH A: If we have an email, try to find the "Real" User first
         if (sessionUser?.email) {
-            query = query.eq('email', sessionUser.email);
-        } else {
-            query = query.eq('device_id', currentId!);
+            const { data: emailUser } = await supabase
+                .from('magic_users')
+                .select('*, purchased_packs')
+                .eq('email', sessionUser.email)
+                .maybeSingle();
+            
+            if (emailUser) {
+                user = emailUser;
+            } else {
+                // 🛑 MERGE DETECTED: User has email, but DB doesn't know it yet.
+                // Check if this device has a "Ghost" history we can claim.
+                const { data: ghostUser } = await supabase
+                    .from('magic_users')
+                    .select('*')
+                    .eq('device_id', currentId)
+                    .is('email', null) // Only claim if it's truly a ghost
+                    .maybeSingle();
+
+                if (ghostUser) {
+                    console.log("👻 Merging Ghost Account into Real Account...");
+                    // UPDATE the ghost row with the new email
+                    const { data: mergedUser, error: mergeError } = await supabase
+                        .from('magic_users')
+                        .update({ email: sessionUser.email })
+                        .eq('id', ghostUser.id)
+                        .select()
+                        .single();
+                    
+                    if (mergedUser) user = mergedUser;
+                }
+            }
+        } 
+        
+        // PATH B: If no email (or merge failed), just look by Device ID
+        if (!user) {
+             const { data: deviceUser } = await supabase
+                .from('magic_users')
+                .select('*, purchased_packs')
+                .eq('device_id', currentId)
+                .maybeSingle();
+             user = deviceUser;
         }
 
-        // [MODIFIED] Use 'let' for the race condition fix
-        let { data: user } = await query.maybeSingle();
-
-        // ---------------------------------------------------------
-        // 🏎️ RACE CONDITION FIX: THE DOUBLE TAP
-        // If a new user shows 0 credits, wait 1s and check again.
-        // ---------------------------------------------------------
-        if (user && (user.remaining_credits === 0 || user.remaining_credits === null) && (user.swap_count === 0 || user.swap_count === null)) {
-             console.log("🏎️ Potential race condition. Retrying fetch in 1000ms...");
-             await new Promise(resolve => setTimeout(resolve, 1000));
-             const { data: retryUser } = await query.maybeSingle();
-             if (retryUser) {
-                 user = retryUser; 
-             }
-        }
+        // [KEEP] Race Condition "Double Tap" Logic follows here...
         // ---------------------------------------------------------
 
         // 4. LOAD USER DATA
