@@ -612,40 +612,69 @@ export default function Home() {
         )}
 
         {/* TEMPLATE GRID (The Product) */}
-        <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
-          <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
-            {TEMPLATES.map((t) => {
-                const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
-                const isLocked = t.isPremium && !isPremiumUser;
+          <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
+            <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
+              {TEMPLATES.map((t, index) => {
+                  // LOGIC: Premium check for functional access
+                  const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
+                  const isLocked = t.isPremium && !isPremiumUser;
 
-                return (
-                    <button 
-                        key={t.id} 
-                        onClick={() => { 
-                            if (isLocked) { 
-                                setPaywallReason('premium'); 
-                                setShowPaywall(true); 
-                            } else { 
-                                setSelectedTemplate(t); 
-                            } 
-                        }} 
-                        className={`
-                            flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center 
-                            ${selectedTemplate.id === t.id ? 'border-yellow-400 scale-105 z-10' : 'border-transparent opacity-90'}
-                        `}
-                    >
-                        <img 
-                            src={t.thumb} 
-                            alt={t.name} 
-                            className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
-                        />
-                        {isLocked && (
-                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full text-xs backdrop-blur-sm">🔒</div>
-                        )}
-                    </button>
-                );
-            })}
-          </div>
+                  return (
+                      <button 
+                          key={t.id} 
+                          onClick={() => { 
+                              if (isLocked) { 
+                                  setPaywallReason('premium'); 
+                                  setShowPaywall(true); 
+                              } else { 
+                                  setSelectedTemplate(t); 
+                              } 
+                          }} 
+                          className={`
+                              flex-shrink-0 w-28 h-28 rounded-xl overflow-hidden border-4 transition-all duration-200 relative snap-center group
+                              ${selectedTemplate.id === t.id ? 'border-yellow-400 scale-105 z-10' : 'border-transparent opacity-90'}
+                          `}
+                      >
+                          <img 
+                              src={t.thumb} 
+                              alt={t.name} 
+                              className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
+                          />
+                          
+                          {/* ✨ THE "TRY FREE" BADGE (Items 1-6) */}
+                          {index < 6 && (
+                            <div className="absolute top-2 right-2 z-20">
+                              <div className="bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white/30 flex items-center gap-1 animate-pulse">
+                                <span>🎁</span>
+                                <span>FREE</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 🔒 THE "PREMIUM" BADGE (Items 7-12) */}
+                          {index >= 6 && isLocked && (
+                            <div className="absolute top-2 right-2 z-20">
+                              <div className="bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <span>🔒</span>
+                                <span>VIP</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* UNLOCKED STATE (If they bought the pass) */}
+                          {index >= 6 && !isLocked && (
+                             <div className="absolute top-2 right-2 z-20">
+                              <div className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                <span>✨</span>
+                                <span>OPEN</span>
+                              </div>
+                            </div>
+                          )}
+
+                      </button>
+                  );
+              })}
+            </div>
 
           {/* PHOTO UPLOAD (The Input) */}
           <div className="mb-8">
