@@ -166,19 +166,19 @@ export default function Home() {
                     .from('magic_users')
                     .insert([{ 
                         device_id: currentId, 
-                        remaining_credits: 1, // The Database gets it
+                        remaining_credits: 1, 
                         swap_count: 0
+                        // CRITICAL: If your table expects 'id' to match Auth, you might need:
+                        // id: sessionUser.id 
                     }]);
 
-                if (!insertError) {
-                    // 2. 🔴 CRITICAL FIX: UPDATE THE UI INSTANTLY
-                    setCredits(1);       // Give the user their credit visually
-                    setFreeUsed(false);  // Ensure they are marked as "Fresh"
-                    setPurchasedPacks(0);
-                    setHasChristmasPass(false);
-                    
-                    // 3. Clear any "poisoned" local storage from previous tests
-                    localStorage.removeItem('giggle_free_used'); 
+                if (insertError) {
+                    console.error("CRITICAL: DB Creation Failed", insertError);
+                    // If DB fails, do NOT give UI credits, or they will hit the 402 wall.
+                    setCredits(0); 
+                } else {
+                    // Only grant UI credits if DB write succeeded
+                    setCredits(1);
                 }
             }
         }
