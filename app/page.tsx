@@ -387,11 +387,11 @@ export default function Home() {
           console.warn("Server rejected swap: Insufficient credits.");
           setIsLoading(false);
           
-          // 🔴 CRITICAL FIX: UPDATE UI TO MATCH SERVER TRUTH
-          setCredits(0);         // Remove the fake credit
-          setFreeUsed(true);     // Mark as used
+          // 🔴 CRITICAL FIX: IF SERVER SAYS NO, UPDATE THE UI
+          setCredits(0);         // Set credits to 0
+          setFreeUsed(true);     // Remove the "Free Gift" button
           
-          // Update Local Storage so it remembers next refresh
+          // Force local storage to remember this
           localStorage.setItem('giggle_free_used', 'true'); 
           
           // Show the Paywall
