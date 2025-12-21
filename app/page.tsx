@@ -384,10 +384,17 @@ export default function Home() {
       const startData = await startRes.json();
       
       if (startRes.status === 402) {
+          console.warn("Server rejected swap: Insufficient credits.");
           setIsLoading(false);
-          setFreeUsed(true); 
+          
+          // 🔴 CRITICAL FIX: UPDATE UI TO MATCH SERVER TRUTH
+          setCredits(0);         // Remove the fake credit
+          setFreeUsed(true);     // Mark as used
+          
+          // Update Local Storage so it remembers next refresh
           localStorage.setItem('giggle_free_used', 'true'); 
-          await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
+          
+          // Show the Paywall
           setPaywallReason('free_limit');
           setShowPaywall(true); 
           return;
@@ -641,9 +648,9 @@ export default function Home() {
                               className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
                           />
                           
-                          {/* ✨ THE "TRY FREE" BADGE (Items 1-6) */}
+                          {/* ✨ THE "FREE" BADGE (Items 1-6) - MOVED TO BOTTOM CENTER */}
                           {index < 6 && (
-                            <div className="absolute top-2 right-2 z-20">
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 w-max">
                               <div className="bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white/30 flex items-center gap-1 animate-pulse">
                                 <span>🎁</span>
                                 <span>FREE</span>
