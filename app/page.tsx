@@ -510,8 +510,8 @@ export default function Home() {
             await navigator.share({
                 files: [file],
                 title: "My GiggleGram Magic! ✨",
-                // EXACT COPY FROM V3 SPEC:
-                text: "I made a little magic with my grandbaby's photo! ✨👶\n\n👇 Try it here:\nhttps://MyGiggleGram.com"
+                // EXACT COPY FROM V5 SPEC:
+                text: "I made a little magic with my favorite little star! ✨🌟\n\n👇 Try it here:\nhttps://MyGiggleGram.com"
             });
         }
         // 4. DESKTOP FALLBACK
