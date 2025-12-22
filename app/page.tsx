@@ -377,6 +377,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
         body: JSON.stringify({ 
+            userId: session?.user?.id, // <--- CRITICAL: Links credit deduction to the UUID
             sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
             targetVideo: selectedTemplate.url 
         }),
