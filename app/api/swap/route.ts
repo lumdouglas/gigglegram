@@ -48,13 +48,13 @@ export async function POST(request: Request) {
     let output;
     try {
         // Model: xrunda/hello 
-        // STANDARD MAPPING FIX: Source = Face, Target = Video
+        // SCHEMA CORRECTION: source = Video, target = Face
         output = await replicate.run(
           "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
           {
             input: {
-              source: sourceImage, // FIX: The FACE is the SOURCE
-              target: targetVideo  // FIX: The VIDEO is the TARGET
+              source: targetVideo, // CORRECT: The Video drives the animation
+              target: sourceImage  // CORRECT: The Face is the subject
             }
           }
         );
