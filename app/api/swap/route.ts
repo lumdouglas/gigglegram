@@ -46,56 +46,72 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json(); 
-    const { sourceImage, targetVideo } = body;
+    // NEW: Accept userId (Boss's Fix)
+    const { sourceImage, targetVideo, userId } = body; 
+    const headerDeviceId = request.headers.get('x-device-id');
 
     if (!sourceImage || !targetVideo) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
     }
 
-    // --- CHECK CREDITS & HISTORY ---
+    // 1. CHECK PERMISSIONS (DO NOT CHARGE YET)
+    // Hybrid Lookup: Prefer UUID, fallback to Device ID
+    const lookupColumn = userId ? 'id' : 'device_id';
+    const lookupValue = userId || headerDeviceId;
+
     const { data: user } = await supabaseAdmin
         .from('magic_users')
-        // CRITICAL FIX: We must SELECT 'swap_count' to increment it
-        .select('remaining_credits, christmas_pass, swap_count') 
-        .eq('device_id', deviceId)
+        .select('remaining_credits, christmas_pass, swap_count, id') 
+        .eq(lookupColumn, lookupValue)
         .maybeSingle();
 
     if (!user || (user.remaining_credits < 1 && !user.christmas_pass)) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // --- PREPARE UPDATES (The "Transaction") ---
+    // 2. RUN AI (AND WAIT FOR RESULT) 🛑
+    let output;
+    try {
+        output = await replicate.run(
+          "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
+          {
+            input: {
+              source: targetVideo, // Video = Driver
+              target: sourceImage  // Face = Subject
+            }
+          }
+        );
+    } catch (aiError: any) {
+        console.error("AI Generation Failed:", aiError);
+        const errString = aiError.toString().toLowerCase();
+
+        // 🔴 SAFETY NET: If AI fails, we return error AND WE DO NOT CHARGE.
+        if (errString.includes("face") || errString.includes("detect") || errString.includes("found")) {
+            return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
+        }
+        throw aiError; 
+    }
+
+    // 3. SUCCESS! NOW WE CHARGE 💸
     const updates: any = {
-        // FIX: Always increment swap_count (Analytics + Paywall Trigger)
         swap_count: (user.swap_count || 0) + 1 
     };
 
-    // Only deduct credit if they are NOT a VIP
     if (!user.christmas_pass) {
-        updates.remaining_credits = user.remaining_credits - 1;
+        // Safe decrement using RPC (or direct update fallback)
+        const { error: chargeError } = await supabaseAdmin.rpc('decrement_credit', { row_id: user.id });
+        if (chargeError) {
+             await supabaseAdmin
+                .from('magic_users')
+                .update({ remaining_credits: user.remaining_credits - 1, ...updates })
+                .eq('id', user.id);
+        }
+    } else {
+        await supabaseAdmin.from('magic_users').update(updates).eq('id', user.id);
     }
 
-    // --- EXECUTE DB UPDATE ---
-    const { error: updateError } = await supabaseAdmin
-        .from('magic_users')
-        .update(updates)
-        .eq('device_id', deviceId);
-
-    if (updateError) {
-        console.error("DB Update Failed:", updateError);
-        return NextResponse.json({ error: 'Transaction Failed' }, { status: 500 });
-    }
-
-    // --- CALL REPLICATE ---
-    const prediction = await replicate.predictions.create({
-      version: "104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440",
-      input: {
-        source: targetVideo, 
-        target: sourceImage  
-      },
-    });
-
-    return NextResponse.json({ success: true, id: prediction.id });
+    // 4. RETURN RESULT
+    return NextResponse.json({ success: true, output });
 
   } catch (error: any) {
     console.error('Swap Error:', error);
