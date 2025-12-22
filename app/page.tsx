@@ -349,111 +349,128 @@ export default function Home() {
     window.open(finalUrl, '_blank');
   };
 
-  // --- HELPER: RESET PHOTO STATE ---
-  const resetPhoto = () => {
-    setSelectedFile(null); // Clear the bad photo
-    setErrorModal(null);   // Close the modal
-    // (The UI will naturally revert to the big "Pick a Photo" box)
-  };
-
   const handleSwap = async () => {
-    if (!selectedFile || !session?.user) return;
+    if (!selectedFile) return;
+
+    if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
+        setPaywallReason('premium');
+        setShowPaywall(true); 
+        return;
+    }
+
+    const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
+    if (!isAllowed) {
+        setPaywallReason('free_limit');
+        setShowPaywall(true); 
+        return; 
+    }
 
     setIsLoading(true);
-    setLoadingMessage("Uploading your photo...");
-    setErrorModal(null); // Clear previous errors
+    setErrorModal(null);
 
     try {
-      // 1. UPLOAD FILE TO SUPABASE STORAGE
-      // We need to upload the file first to get a URL for Replicate
-      const filename = `${session.user.id}-${Date.now()}.jpg`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-uploads') // Ensure this bucket exists in Supabase Storage
-        .upload(filename, selectedFile, { upsert: true });
+      const filename = `${deviceId}-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage.from('uploads').upload(filename, selectedFile);
+      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
 
-      if (uploadError) throw uploadError;
-
-      // 2. GET PUBLIC URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-uploads')
-        .getPublicUrl(filename);
-
-      if (!publicUrl) throw new Error("Failed to get image URL");
-
-      setLoadingMessage("Generating magic video... (This takes ~15s)");
-
-      // 3. CALL THE API (The Corrected Fetch)
       const startRes = await fetch('/api/swap', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: session.user.id,        // Authenticated User ID
-          sourceImage: publicUrl,         // The uploaded photo URL
-          targetVideo: selectedTemplate.url // FIX: Changed .video to .url based on your type definition
+        headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
+        body: JSON.stringify({ 
+            sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
+            targetVideo: selectedTemplate.url 
         }),
       });
-
-      // 4. HANDLE RESPONSE ERRORS
+      
+      const startData = await startRes.json();
+      
       if (startRes.status === 402) {
           console.warn("Server rejected swap: Insufficient credits.");
           setIsLoading(false);
-          setCredits(0);
-          setFreeUsed(true);
-          localStorage.setItem('giggle_free_used', 'true');
-          setPaywallReason('free_limit');
-          setShowPaywall(true);
-          return;
-      }
-
-      if (startRes.status === 400) {
-          // This catches the "No Face" error we set up in the API
-          const errData = await startRes.json();
-          console.warn("Bad Request:", errData.error);
-          setIsLoading(false);
           
-          setErrorModal({
-              type: 'NO_FACE',
-              title: 'The elves are scratching their heads!',
-              message: 'We couldn\'t find a face in that photo.',
-              btnText: 'Pick a Different Photo',
-              action: resetPhoto
-          });
+          // 🔴 CRITICAL FIX: IF SERVER SAYS NO, UPDATE THE UI
+          setCredits(0);         // Set credits to 0
+          setFreeUsed(true);     // Remove the "Free Gift" button
+          
+          // Force local storage to remember this
+          localStorage.setItem('giggle_free_used', 'true'); 
+          
+          // Show the Paywall
+          setPaywallReason('free_limit');
+          setShowPaywall(true); 
           return;
       }
 
-      if (!startRes.ok) {
-          throw new Error(`Server error: ${startRes.status}`);
-      }
+      if (startRes.status === 400) throw { type: 'USER_ERROR' };
+      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
+      if (startRes.status === 429) throw { type: 'MELTDOWN' };
+      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
+      
+      const predictionId = startData.id;
 
-      // 5. SUCCESS! SHOW RESULT
-      const data = await startRes.json();
-      
-      // The API now returns { success: true, output: [url] }
-      // Replicate usually returns an array for outputs
-      const videoUrl = Array.isArray(data.output) ? data.output[0] : data.output;
-      
-      setResultVideoUrl(videoUrl);
-      
-      // Update UI credits immediately (Visual Sync)
-      if (!hasChristmasPass) {
-          setCredits(prev => Math.max(0, prev - 1));
-          setFreeUsed(true);
-          localStorage.setItem('giggle_free_used', 'true');
-      }
+      while (true) {
+        await new Promise(r => setTimeout(r, 3000));
+        const checkRes = await fetch(`/api/swap?id=${predictionId}`);
+        const checkData = await checkRes.json();
 
+        if (checkData.status === 'succeeded') {
+            if (!hasChristmasPass) {
+                if (credits > 0) {
+                    // --- 🔴 CRITICAL MISSING LINK START ---
+                    // We must tell the SERVER the credit is gone. 
+                    // Without this, a browser cache clear restores the credit.
+                    if (deviceId) {
+                        await supabase
+                            .from('magic_users')
+                            .update({ remaining_credits: credits - 1 }) // Deduct from DB
+                            .eq('device_id', deviceId);
+                    }
+                    // --- 🔴 CRITICAL MISSING LINK END ---
+
+                    setCredits(prev => prev - 1); // Update Local State
+                } else {
+                    setFreeUsed(true);
+                    localStorage.setItem('giggle_free_used', 'true'); 
+                    await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
+                }
+            }
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            
+            let finalUrl = checkData.output;
+            if (Array.isArray(finalUrl)) {
+                finalUrl = finalUrl[0];
+            }
+            setResultVideoUrl(finalUrl);
+            
+            setIsLoading(false);
+            break;
+        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+            const errText = (checkData.error || '').toLowerCase();
+            if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
+            throw { type: 'MELTDOWN' };
+        }
+      }
     } catch (err: any) {
-      console.error("Swap failed:", err);
-      setErrorModal({
-          type: 'GENERIC',
-          title: "Oh no! The magic fizzled.",
-          message: "Something went wrong while making your video. Please try again!",
-          btnText: "Try Again",
-          action: () => setErrorModal(null)
-      });
-    } finally {
+      console.error("Swap Error:", err);
       setIsLoading(false);
+      let modal = {
+          title: "🍪 The elves are on a cookie break!",
+          message: "Please come back in 10 minutes!",
+          btnText: "Refresh Page",
+          btnColor: "bg-gray-500 text-white",
+          action: () => window.location.reload()
+      };
+      const type = err.type || 'MELTDOWN';
+      if (type === 'USER_ERROR') {
+          modal = {
+              title: "🎅 No face found!",
+              message: "Please pick a clearer photo where they are looking at the camera!",
+              btnText: "Try Again",
+              btnColor: "bg-teal-600 text-white",
+              action: () => { setErrorModal(null); setSelectedFile(null); }
+          };
+      }
+      setErrorModal(modal);
     }
   };
 
@@ -724,48 +741,14 @@ export default function Home() {
                         : 'Make the Magic! ✨'}
           </button>
 
-          {/* ERROR MODAL (Handles Generic & No Face) */}
+          {/* ERROR MODAL (Sad Path) */}
           {errorModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                
-                {/* 1. VARIANT: NO FACE DETECTED (The "Elf" UI) */}
-                {errorModal.type === 'NO_FACE' ? (
-                    <div className="bg-white p-6 rounded-2xl shadow-2xl border-2 border-red-100 text-center max-w-sm mx-auto relative overflow-hidden">
-                        {/* VISUAL: Confused Emoji */}
-                        <div className="text-6xl mb-4 animate-bounce">🧐</div>
-
-                        {/* HEADLINE */}
-                        <h2 className="text-xl font-bold text-teal-900 mb-2">
-                            The elves are scratching their heads!
-                        </h2>
-
-                        {/* BODY */}
-                        <p className="text-gray-600 mb-6 text-lg leading-snug">
-                            We couldn&apos;t find a face in that photo. Please pick a clearer photo where your star is looking right at the camera! 📸
-                        </p>
-
-                        {/* ACTION: Reset Upload State */}
-                        <button 
-                            onClick={resetPhoto}
-                            className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-4 px-6 rounded-full text-xl shadow-lg transition-transform transform active:scale-95"
-                        >
-                            Pick a Different Photo
-                        </button>
-                    </div>
-                ) : (
-                    
-                    // 2. VARIANT: GENERIC ERROR (System Crash)
-                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-                        <h3 className="text-xl font-bold mb-2 text-rose-600">{errorModal.title}</h3>
-                        <p className="mb-4 text-gray-600">{errorModal.message}</p>
-                        <button 
-                            onClick={errorModal.action} 
-                            className={`w-full py-3 rounded-xl font-bold text-white shadow-md active:scale-95 transition-transform ${errorModal.btnColor || 'bg-gray-800'}`}
-                        >
-                            {errorModal.btnText}
-                        </button>
-                    </div>
-                )}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+                <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
+                    <h3 className="text-xl font-bold mb-2">{errorModal.title}</h3>
+                    <p className="mb-4">{errorModal.message}</p>
+                    <button onClick={errorModal.action} className={`w-full py-3 rounded-xl font-bold ${errorModal.btnColor}`}>{errorModal.btnText}</button>
+                </div>
             </div>
           )}
 
