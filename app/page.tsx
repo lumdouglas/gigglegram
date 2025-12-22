@@ -349,6 +349,13 @@ export default function Home() {
     window.open(finalUrl, '_blank');
   };
 
+  // --- HELPER: RESET PHOTO STATE ---
+  const resetPhoto = () => {
+    setSelectedFile(null); // Clear the bad photo
+    setErrorModal(null);   // Close the modal
+    // (The UI will naturally revert to the big "Pick a Photo" box)
+  };
+
   const handleSwap = async () => {
     if (!selectedFile) return;
 
@@ -401,7 +408,21 @@ export default function Home() {
           return;
       }
 
-      if (startRes.status === 400) throw { type: 'USER_ERROR' };
+      // 🔴 NEW: CATCH "NO FACE" ERROR (400 Bad Request)
+      if (startRes.status === 400) {
+          console.warn("Server rejected photo: No Face Found");
+          setIsLoading(false);
+          
+          setErrorModal({
+              type: 'NO_FACE', // This triggers the specific UI
+              title: 'The elves are scratching their heads!', // Fallback
+              message: 'We couldn\'t find a face in that photo.', // Fallback
+              btnText: 'Pick a Different Photo',
+              action: resetPhoto
+          });
+          return;
+      }
+
       if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
       if (startRes.status === 429) throw { type: 'MELTDOWN' };
       if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
@@ -741,14 +762,48 @@ export default function Home() {
                         : 'Make the Magic! ✨'}
           </button>
 
-          {/* ERROR MODAL (Sad Path) */}
+          {/* ERROR MODAL (Handles Generic & No Face) */}
           {errorModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-                <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
-                    <h3 className="text-xl font-bold mb-2">{errorModal.title}</h3>
-                    <p className="mb-4">{errorModal.message}</p>
-                    <button onClick={errorModal.action} className={`w-full py-3 rounded-xl font-bold ${errorModal.btnColor}`}>{errorModal.btnText}</button>
-                </div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                
+                {/* 1. VARIANT: NO FACE DETECTED (The "Elf" UI) */}
+                {errorModal.type === 'NO_FACE' ? (
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl border-2 border-red-100 text-center max-w-sm mx-auto relative overflow-hidden">
+                        {/* VISUAL: Confused Emoji */}
+                        <div className="text-6xl mb-4 animate-bounce">🧐</div>
+
+                        {/* HEADLINE */}
+                        <h2 className="text-xl font-bold text-teal-900 mb-2">
+                            The elves are scratching their heads!
+                        </h2>
+
+                        {/* BODY */}
+                        <p className="text-gray-600 mb-6 text-lg leading-snug">
+                            We couldn&apos;t find a face in that photo. Please pick a clearer photo where your star is looking right at the camera! 📸
+                        </p>
+
+                        {/* ACTION: Reset Upload State */}
+                        <button 
+                            onClick={resetPhoto}
+                            className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-4 px-6 rounded-full text-xl shadow-lg transition-transform transform active:scale-95"
+                        >
+                            Pick a Different Photo
+                        </button>
+                    </div>
+                ) : (
+                    
+                    // 2. VARIANT: GENERIC ERROR (System Crash)
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
+                        <h3 className="text-xl font-bold mb-2 text-rose-600">{errorModal.title}</h3>
+                        <p className="mb-4 text-gray-600">{errorModal.message}</p>
+                        <button 
+                            onClick={errorModal.action} 
+                            className={`w-full py-3 rounded-xl font-bold text-white shadow-md active:scale-95 transition-transform ${errorModal.btnColor || 'bg-gray-800'}`}
+                        >
+                            {errorModal.btnText}
+                        </button>
+                    </div>
+                )}
             </div>
           )}
 
