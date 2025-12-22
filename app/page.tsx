@@ -165,6 +165,7 @@ export default function Home() {
                 const { error: insertError } = await supabase
                     .from('magic_users')
                     .insert([{ 
+                        id: sessionUser.id,
                         device_id: currentId, 
                         remaining_credits: 1, 
                         swap_count: 0
@@ -622,9 +623,29 @@ export default function Home() {
           <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
             <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
               {TEMPLATES.map((t, index) => {
-                  // LOGIC: Premium check for functional access
+                  // 1. DETERMINE ACCESS & LOCK STATE
                   const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
                   const isLocked = t.isPremium && !isPremiumUser;
+
+                  // 2. CALCULATE BADGE CONFIG (The "Nana Logic")
+                  let badge = { text: "", color: "", position: "" };
+
+                  if (hasChristmasPass) {
+                      // CASE A: The Queen
+                      badge = { text: "✨ UNLIMITED", color: "bg-amber-400 text-black", position: "bottom" };
+                  } else if (credits > 0) {
+                      // CASE B: The Wallet Holder (Honest Pricing)
+                      badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
+                  } else {
+                      // CASE C: Empty Wallet / Guest
+                      if (index < 6) {
+                           // Free Tier (Invitation)
+                           badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
+                      } else {
+                           // Premium Tier (Gate)
+                           badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
+                      }
+                  }
 
                   return (
                       <button 
@@ -648,28 +669,19 @@ export default function Home() {
                               className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
                           />
                           
-                          {/* ✨ THE "FREE" BADGE (Items 1-6) - MOVED TO BOTTOM CENTER */}
-                          {index < 6 && (
-                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 w-max">
-                              <div className="bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white/30 flex items-center gap-1 animate-pulse">
-                                <span>🎁</span>
-                                <span>FREE</span>
+                          {/* DYNAMIC BADGE RENDERER */}
+                          {badge.text && (
+                              <div className={`absolute z-20 w-max ${
+                                  badge.position === 'top' ? 'top-2 right-2' : 'bottom-2 left-1/2 -translate-x-1/2'
+                              }`}>
+                                  <div className={`${badge.color} text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white/30 flex items-center gap-1`}>
+                                      <span>{badge.text}</span>
+                                  </div>
                               </div>
-                            </div>
                           )}
 
-                          {/* 🔒 THE "PREMIUM" BADGE (Items 7-12) */}
-                          {index >= 6 && isLocked && (
-                            <div className="absolute top-2 right-2 z-20">
-                              <div className="bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <span>🔒</span>
-                                <span>VIP</span>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* UNLOCKED STATE (If they bought the pass) */}
-                          {index >= 6 && !isLocked && (
+                          {/* VIP OVERRIDE: Show 'OPEN' if it was premium but is now unlocked */}
+                          {index >= 6 && !isLocked && !hasChristmasPass && credits === 0 && (
                              <div className="absolute top-2 right-2 z-20">
                               <div className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                                 <span>✨</span>
@@ -677,7 +689,6 @@ export default function Home() {
                               </div>
                             </div>
                           )}
-
                       </button>
                   );
               })}
