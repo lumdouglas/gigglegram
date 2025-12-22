@@ -357,141 +357,103 @@ export default function Home() {
   };
 
   const handleSwap = async () => {
-    if (!selectedFile) return;
-
-    if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
-        setPaywallReason('premium');
-        setShowPaywall(true); 
-        return;
-    }
-
-    const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
-    if (!isAllowed) {
-        setPaywallReason('free_limit');
-        setShowPaywall(true); 
-        return; 
-    }
+    if (!selectedFile || !session?.user) return;
 
     setIsLoading(true);
-    setErrorModal(null);
+    setLoadingMessage("Uploading your photo...");
+    setErrorModal(null); // Clear previous errors
 
     try {
-      const filename = `${deviceId}-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from('uploads').upload(filename, selectedFile);
-      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
+      // 1. UPLOAD FILE TO SUPABASE STORAGE
+      // We need to upload the file first to get a URL for Replicate
+      const filename = `${session.user.id}-${Date.now()}.jpg`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('user-uploads') // Ensure this bucket exists in Supabase Storage
+        .upload(filename, selectedFile, { upsert: true });
 
+      if (uploadError) throw uploadError;
+
+      // 2. GET PUBLIC URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('user-uploads')
+        .getPublicUrl(filename);
+
+      if (!publicUrl) throw new Error("Failed to get image URL");
+
+      setLoadingMessage("Generating magic video... (This takes ~15s)");
+
+      // 3. CALL THE API (The Corrected Fetch)
       const startRes = await fetch('/api/swap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
-        body: JSON.stringify({ 
-            sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
-            targetVideo: selectedTemplate.url 
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: session.user.id,        // Authenticated User ID
+          sourceImage: publicUrl,         // The uploaded photo URL
+          targetVideo: selectedTemplate.url // FIX: Changed .video to .url based on your type definition
         }),
       });
-      
-      const startData = await startRes.json();
-      
+
+      // 4. HANDLE RESPONSE ERRORS
       if (startRes.status === 402) {
           console.warn("Server rejected swap: Insufficient credits.");
           setIsLoading(false);
-          
-          // 🔴 CRITICAL FIX: IF SERVER SAYS NO, UPDATE THE UI
-          setCredits(0);         // Set credits to 0
-          setFreeUsed(true);     // Remove the "Free Gift" button
-          
-          // Force local storage to remember this
-          localStorage.setItem('giggle_free_used', 'true'); 
-          
-          // Show the Paywall
+          setCredits(0);
+          setFreeUsed(true);
+          localStorage.setItem('giggle_free_used', 'true');
           setPaywallReason('free_limit');
-          setShowPaywall(true); 
+          setShowPaywall(true);
           return;
       }
 
-      // 🔴 NEW: CATCH "NO FACE" ERROR (400 Bad Request)
       if (startRes.status === 400) {
-          console.warn("Server rejected photo: No Face Found");
+          // This catches the "No Face" error we set up in the API
+          const errData = await startRes.json();
+          console.warn("Bad Request:", errData.error);
           setIsLoading(false);
           
           setErrorModal({
-              type: 'NO_FACE', // This triggers the specific UI
-              title: 'The elves are scratching their heads!', // Fallback
-              message: 'We couldn\'t find a face in that photo.', // Fallback
+              type: 'NO_FACE',
+              title: 'The elves are scratching their heads!',
+              message: 'We couldn\'t find a face in that photo.',
               btnText: 'Pick a Different Photo',
               action: resetPhoto
           });
           return;
       }
 
-      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
-      if (startRes.status === 429) throw { type: 'MELTDOWN' };
-      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
+      if (!startRes.ok) {
+          throw new Error(`Server error: ${startRes.status}`);
+      }
+
+      // 5. SUCCESS! SHOW RESULT
+      const data = await startRes.json();
       
-      const predictionId = startData.id;
-
-      while (true) {
-        await new Promise(r => setTimeout(r, 3000));
-        const checkRes = await fetch(`/api/swap?id=${predictionId}`);
-        const checkData = await checkRes.json();
-
-        if (checkData.status === 'succeeded') {
-            if (!hasChristmasPass) {
-                if (credits > 0) {
-                    // --- 🔴 CRITICAL MISSING LINK START ---
-                    // We must tell the SERVER the credit is gone. 
-                    // Without this, a browser cache clear restores the credit.
-                    if (deviceId) {
-                        await supabase
-                            .from('magic_users')
-                            .update({ remaining_credits: credits - 1 }) // Deduct from DB
-                            .eq('device_id', deviceId);
-                    }
-                    // --- 🔴 CRITICAL MISSING LINK END ---
-
-                    setCredits(prev => prev - 1); // Update Local State
-                } else {
-                    setFreeUsed(true);
-                    localStorage.setItem('giggle_free_used', 'true'); 
-                    await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
-                }
-            }
-            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            
-            let finalUrl = checkData.output;
-            if (Array.isArray(finalUrl)) {
-                finalUrl = finalUrl[0];
-            }
-            setResultVideoUrl(finalUrl);
-            
-            setIsLoading(false);
-            break;
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            const errText = (checkData.error || '').toLowerCase();
-            if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
-            throw { type: 'MELTDOWN' };
-        }
+      // The API now returns { success: true, output: [url] }
+      // Replicate usually returns an array for outputs
+      const videoUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+      
+      setResultVideoUrl(videoUrl);
+      
+      // Update UI credits immediately (Visual Sync)
+      if (!hasChristmasPass) {
+          setCredits(prev => Math.max(0, prev - 1));
+          setFreeUsed(true);
+          localStorage.setItem('giggle_free_used', 'true');
       }
+
     } catch (err: any) {
-      console.error("Swap Error:", err);
+      console.error("Swap failed:", err);
+      setErrorModal({
+          type: 'GENERIC',
+          title: "Oh no! The magic fizzled.",
+          message: "Something went wrong while making your video. Please try again!",
+          btnText: "Try Again",
+          action: () => setErrorModal(null)
+      });
+    } finally {
       setIsLoading(false);
-      let modal = {
-          title: "🍪 The elves are on a cookie break!",
-          message: "Please come back in 10 minutes!",
-          btnText: "Refresh Page",
-          btnColor: "bg-gray-500 text-white",
-          action: () => window.location.reload()
-      };
-      const type = err.type || 'MELTDOWN';
-      if (type === 'USER_ERROR') {
-          modal = {
-              title: "🎅 No face found!",
-              message: "Please pick a clearer photo where they are looking at the camera!",
-              btnText: "Try Again",
-              btnColor: "bg-teal-600 text-white",
-              action: () => { setErrorModal(null); setSelectedFile(null); }
-          };
-      }
-      setErrorModal(modal);
     }
   };
 

@@ -17,37 +17,44 @@ export async function POST(request: Request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const deviceId = request.headers.get('x-device-id');
-  
   try {
     const body = await request.json(); 
-    const { sourceImage, targetVideo } = body;
+    // EXPECTING: userId (UUID) from Supabase Auth, sourceImage (Face URL), targetVideo (Template URL)
+    const { userId, sourceImage, targetVideo } = body; 
 
-    if (!sourceImage || !targetVideo) {
-       return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
+    if (!userId || !sourceImage || !targetVideo) {
+       return NextResponse.json({ error: 'Missing Data: userId, source, or target' }, { status: 400 });
     }
 
     // 1. CHECK PERMISSIONS (DO NOT Charge Yet)
-    const { data: user } = await supabaseAdmin
+    // FIX: Query by 'id' (UUID) which matches Auth ID
+    const { data: user, error: dbError } = await supabaseAdmin
         .from('magic_users')
         .select('remaining_credits, christmas_pass, swap_count, id') 
-        .eq('device_id', deviceId)
+        .eq('id', userId) 
         .maybeSingle();
 
-    if (!user || (user.remaining_credits < 1 && !user.christmas_pass)) {
+    if (dbError || !user) {
+        console.error("User Lookup Failed:", userId, dbError);
+        return NextResponse.json({ error: 'User not found' }, { status: 401 });
+    }
+
+    // PAYWALL LOGIC: Check credits before AI
+    if (user.remaining_credits < 1 && !user.christmas_pass) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
     // 2. RUN AI (AND WAIT FOR RESULT)
-    // Using xrunda/hello for strict face swap
     let output;
     try {
+        // Model: xrunda/hello 
+        // STANDARD MAPPING FIX: Source = Face, Target = Video
         output = await replicate.run(
           "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
           {
             input: {
-              source: targetVideo, // Template Video
-              target: sourceImage  // User Face
+              source: sourceImage, // FIX: The FACE is the SOURCE
+              target: targetVideo  // FIX: The VIDEO is the TARGET
             }
           }
         );
@@ -56,26 +63,21 @@ export async function POST(request: Request) {
         const errString = aiError.toString().toLowerCase();
 
         // 🔴 CATCH "NO FACE" ERROR
-        // Triggers the "Elf Modal" on the frontend
         if (errString.includes("face") || errString.includes("detect") || errString.includes("found")) {
             return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
         }
-        throw aiError; // Throw other errors to the general catch
+        throw aiError; 
     }
 
     // 3. SUCCESS! NOW WE CHARGE THE CREDIT
-    // If we reached here, the video is ready.
-    
     const updates: any = {
         swap_count: (user.swap_count || 0) + 1 
     };
 
-    // Only deduct if NOT a VIP
     if (!user.christmas_pass) {
-        // Use RPC if available, or standard update
+        // Attempt RPC decrement, fallback to direct update
         const { error: chargeError } = await supabaseAdmin.rpc('decrement_credit', { row_id: user.id });
         
-        // Fallback for safety if RPC fails or doesn't exist:
         if (chargeError) {
              console.warn("RPC failed, using direct update");
              await supabaseAdmin
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
                 .eq('id', user.id);
         }
     } else {
-        // VIP: Just update history
+        // VIPs just track stats
         await supabaseAdmin.from('magic_users').update(updates).eq('id', user.id);
     }
 
