@@ -46,19 +46,15 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json(); 
-    // NEW: Accept userId (Boss's Fix)
+    // Extract userId from the body
     const { sourceImage, targetVideo, userId } = body; 
+    
+    // FALLBACK: If userId is missing, try device_id headers
     const headerDeviceId = request.headers.get('x-device-id');
-
-    if (!sourceImage || !targetVideo) {
-       return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
-    }
-
-    // 1. CHECK PERMISSIONS (DO NOT CHARGE YET)
-    // Hybrid Lookup: Prefer UUID, fallback to Device ID
     const lookupColumn = userId ? 'id' : 'device_id';
     const lookupValue = userId || headerDeviceId;
 
+    // QUERY DB using the smart column
     const { data: user } = await supabaseAdmin
         .from('magic_users')
         .select('remaining_credits, christmas_pass, swap_count, id') 
