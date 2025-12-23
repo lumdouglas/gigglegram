@@ -18,8 +18,6 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json(); 
-    
-    // 1. EXTRACT DATA (Including userId)
     const { sourceImage, targetVideo, userId } = body; 
     const headerDeviceId = request.headers.get('x-device-id');
 
@@ -27,12 +25,9 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
     }
 
-    // 2. HYBRID LOOKUP (Priority: UUID > Device ID)
+    // 1. HYBRID LOOKUP
     const lookupColumn = userId ? 'id' : 'device_id';
     const lookupValue = userId || headerDeviceId;
-
-    // DEBUG: Uncomment to see who the server is looking for
-    // console.log(`🔍 LOOKUP: ${lookupColumn} = ${lookupValue}`);
 
     const { data: user } = await supabaseAdmin
         .from('magic_users')
@@ -40,12 +35,37 @@ export async function POST(request: Request) {
         .eq(lookupColumn, lookupValue)
         .maybeSingle();
 
-    // CHECK 1: PERMISSIONS (Do not charge yet)
     if (!user || (user.remaining_credits < 1 && !user.christmas_pass)) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // 3. RUN AI (Synchronous - Wait for result)
+    // 🔴 2. THE ELF GUARD (Pre-Check)
+    // We use BLIP to ask if there is a person/face. This prevents "Tree Photos" from stealing credits.
+    try {
+        const caption: any = await replicate.run(
+            "salesforce/blip:2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
+            {
+                input: {
+                    image: sourceImage,
+                    task: "visual_question_answering",
+                    question: "Is there a human face, person, or baby in this photo? Answer yes or no."
+                }
+            }
+        );
+
+        const answer = (caption || "").toString().toLowerCase();
+        console.log("🧝 ELF GUARD SAYS:", answer);
+
+        // If the Guard says "no", we STOP here.
+        if (answer.includes("no")) {
+             return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
+        }
+    } catch (guardError) {
+        console.warn("Elf Guard failed, skipping check...", guardError);
+        // If Guard fails, we proceed (fail open) to avoid blocking valid users
+    }
+
+    // 3. RUN MAGIC (Synchronous)
     let output;
     try {
         output = await replicate.run(
@@ -60,15 +80,13 @@ export async function POST(request: Request) {
     } catch (aiError: any) {
         console.error("AI Generation Failed:", aiError);
         const errString = aiError.toString().toLowerCase();
-
-        // 🔴 SAD PATH: Catch "No Face" -> Return 400
-        if (errString.includes("face") || errString.includes("detect") || errString.includes("found")) {
+        if (errString.includes("face") || errString.includes("detect")) {
             return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
         }
         throw aiError; 
     }
 
-    // 4. SUCCESS -> NOW WE CHARGE CREDIT 💸
+    // 4. SUCCESS -> CHARGE CREDIT
     const updates: any = {
         swap_count: (user.swap_count || 0) + 1 
     };
