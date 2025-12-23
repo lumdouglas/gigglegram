@@ -40,10 +40,11 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // 🔴 3. RUN MAGIC (Sync Mode - No Elf Guard)
+    // 🔴 3. RUN MAGIC (Synchronous)
     let output;
     try {
-        console.log("🚀 STARTING AI...");
+        console.log("🚀 STARTING AI WITH:", sourceImage); 
+        
         output = await replicate.run(
           "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
           {
@@ -56,22 +57,24 @@ export async function POST(request: Request) {
         console.log("✅ AI SUCCESS");
 
     } catch (aiError: any) {
-        // 🔴 DETAILED ERROR LOGGING
-        console.error("❌ AI CRASHED:", aiError);
-        
-        // Check specifically for Replicate "Download Failed" (Bucket Permission / URL issues)
-        const errString = aiError.toString().toLowerCase();
-        if (errString.includes("download") || errString.includes("file")) {
-            console.error("⚠️ CHECK YOUR SUPABASE BUCKET PERMISSIONS!");
+        // 🔴 INTELLIGENT ERROR SORTING
+        const errString = (aiError.message || aiError.toString()).toLowerCase();
+        console.error("❌ AI CRASHED:", errString);
+
+        // CASE A: ACCESS ERROR (System Issue)
+        // If Replicate cannot download the file, it's a Bucket Permission issue.
+        if (errString.includes("download") || errString.includes("status code") || errString.includes("403") || errString.includes("404")) {
+            console.error("🚨 CRITICAL: Replicate cannot download the image. Check Supabase Bucket Public Settings!");
+            return NextResponse.json({ error: "System Error: Cannot access photo." }, { status: 500 });
         }
 
-        // CATCH-ALL: Prevent 500. Return 400 so UI shows Elf Modal.
-        // We DO NOT charge the user here.
-        return NextResponse.json({ error: "AI Processing Failed" }, { status: 400 });
+        // CASE B: FACE/PROCESSING ERROR (User Issue)
+        // If it's not a download error, it's likely the model failing on the pixels (No Face).
+        // We catch this and show the Elf Modal.
+        return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
     }
 
     // 4. SUCCESS -> CHARGE CREDIT
-    // This code is ONLY reached if the AI did not crash.
     const updates: any = {
         swap_count: (user.swap_count || 0) + 1 
     };
