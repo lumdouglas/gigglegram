@@ -885,6 +885,27 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* FOOTER: TRUST MOAT */}
+      <footer className="mt-24 pb-8 border-t border-gray-100 pt-8">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8">
+            <a 
+                href="/privacy" 
+                className="text-gray-400 font-bold hover:text-teal-600 px-6 py-4 min-h-[70px] flex items-center transition-colors text-sm"
+            >
+                Privacy Notice
+            </a>
+            <a 
+                href="/terms" 
+                className="text-gray-400 font-bold hover:text-teal-600 px-6 py-4 min-h-[70px] flex items-center transition-colors text-sm"
+            >
+                Terms of Service
+            </a>
+        </div>
+        <p className="text-center text-[10px] text-gray-300 mt-2 font-medium">
+            © 2025 MyGiggleGram. Made with 🎄 in the North Pole.
+        </p>
+      </footer>
     </main>
   );
 }
