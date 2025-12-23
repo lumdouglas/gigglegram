@@ -39,8 +39,8 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // 🔴 2. THE ELF GUARD (Pre-Check)
-    // We use BLIP to ask if there is a person/face. This prevents "Tree Photos" from stealing credits.
+    // 2. THE ELF GUARD (Pre-Check)
+    // We try to check for a face. If this fails/errors, we just log it and move on.
     try {
         const caption: any = await replicate.run(
             "salesforce/blip:2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
@@ -56,13 +56,11 @@ export async function POST(request: Request) {
         const answer = (caption || "").toString().toLowerCase();
         console.log("🧝 ELF GUARD SAYS:", answer);
 
-        // If the Guard says "no", we STOP here.
         if (answer.includes("no")) {
-             return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
+             return NextResponse.json({ error: "No face detected (Elf Guard)" }, { status: 400 });
         }
     } catch (guardError) {
-        console.warn("Elf Guard failed, skipping check...", guardError);
-        // If Guard fails, we proceed (fail open) to avoid blocking valid users
+        console.warn("Elf Guard skipped:", guardError);
     }
 
     // 3. RUN MAGIC (Synchronous)
@@ -79,11 +77,10 @@ export async function POST(request: Request) {
         );
     } catch (aiError: any) {
         console.error("AI Generation Failed:", aiError);
-        const errString = aiError.toString().toLowerCase();
-        if (errString.includes("face") || errString.includes("detect")) {
-            return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
-        }
-        throw aiError; 
+        // 🔴 FIX: CATCH-ALL SAFETY NET
+        // Instead of crashing (500), we assume ANY AI failure is a bad photo (400).
+        // This ensures the user sees the Elf Modal ("Pick a different photo").
+        return NextResponse.json({ error: "AI Processing Failed" }, { status: 400 });
     }
 
     // 4. SUCCESS -> CHARGE CREDIT
