@@ -350,14 +350,15 @@ export default function Home() {
   };
 
   const handleSwap = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !session?.user) return; // Ensure session exists
 
+    // 1. FRONTEND PERMISSION CHECK
     if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
         setPaywallReason('premium');
         setShowPaywall(true); 
         return;
     }
-
+    // Allow if VIP, has credits, or using free gift
     const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
     if (!isAllowed) {
         setPaywallReason('free_limit');
@@ -366,112 +367,98 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    setErrorModal(null);
+    // Start the Santa Script
+    setLoadingMessage("Connecting to the North Pole... 📡");
+    setErrorModal(null); 
 
     try {
-      const filename = `${deviceId}-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from('uploads').upload(filename, selectedFile);
-      if (uploadError) throw { type: 'UPLOAD_FAIL', message: uploadError.message };
+      // 2. UPLOAD IMAGE
+      const filename = `${session.user.id}-${Date.now()}.jpg`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('uploads') // CHECK: Is your bucket 'uploads' or 'user-uploads'?
+        .upload(filename, selectedFile, { upsert: true });
 
+      if (uploadError) throw new Error("Upload failed: " + uploadError.message);
+
+      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`;
+
+      // 3. CALL API (SYNC MODE)
       const startRes = await fetch('/api/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
         body: JSON.stringify({ 
-            userId: session?.user?.id, // <--- CRITICAL: Links credit deduction to the UUID
-            sourceImage: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`,
+            userId: session.user.id, // 🔴 CRITICAL: Sends UUID to fix 402 Error
+            sourceImage: publicUrl,
             targetVideo: selectedTemplate.url 
         }),
       });
+
+      // 4. HANDLE RESPONSES
       
-      const startData = await startRes.json();
-      
+      // CASE A: Paywall (402)
       if (startRes.status === 402) {
-          console.warn("Server rejected swap: Insufficient credits.");
           setIsLoading(false);
-          
-          // 🔴 CRITICAL FIX: IF SERVER SAYS NO, UPDATE THE UI
-          setCredits(0);         // Set credits to 0
-          setFreeUsed(true);     // Remove the "Free Gift" button
-          
-          // Force local storage to remember this
-          localStorage.setItem('giggle_free_used', 'true'); 
-          
-          // Show the Paywall
+          setCredits(0);
+          setFreeUsed(true);
+          localStorage.setItem('giggle_free_used', 'true');
           setPaywallReason('free_limit');
-          setShowPaywall(true); 
+          setShowPaywall(true);
           return;
       }
 
-      if (startRes.status === 400) throw { type: 'USER_ERROR' };
-      if (startRes.status === 504 || startRes.status === 500) throw { type: 'SERVER_HICCUP' };
-      if (startRes.status === 429) throw { type: 'MELTDOWN' };
-      if (!startData.success) throw { type: 'MELTDOWN', message: startData.error };
-      
-      const predictionId = startData.id;
-
-      while (true) {
-        await new Promise(r => setTimeout(r, 3000));
-        const checkRes = await fetch(`/api/swap?id=${predictionId}`);
-        const checkData = await checkRes.json();
-
-        if (checkData.status === 'succeeded') {
-            if (!hasChristmasPass) {
-                if (credits > 0) {
-                    // --- 🔴 CRITICAL MISSING LINK START ---
-                    // We must tell the SERVER the credit is gone. 
-                    // Without this, a browser cache clear restores the credit.
-                    if (deviceId) {
-                        await supabase
-                            .from('magic_users')
-                            .update({ remaining_credits: credits - 1 }) // Deduct from DB
-                            .eq('device_id', deviceId);
-                    }
-                    // --- 🔴 CRITICAL MISSING LINK END ---
-
-                    setCredits(prev => prev - 1); // Update Local State
-                } else {
-                    setFreeUsed(true);
-                    localStorage.setItem('giggle_free_used', 'true'); 
-                    await supabase.from('magic_users').update({ free_swap_used: true }).eq('device_id', deviceId);
-                }
-            }
-            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            
-            let finalUrl = checkData.output;
-            if (Array.isArray(finalUrl)) {
-                finalUrl = finalUrl[0];
-            }
-            setResultVideoUrl(finalUrl);
-            
-            setIsLoading(false);
-            break;
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            const errText = (checkData.error || '').toLowerCase();
-            if (errText.includes('face') || errText.includes('detect')) throw { type: 'USER_ERROR' };
-            throw { type: 'MELTDOWN' };
-        }
+      // CASE B: Sad Path (400 - No Face)
+      if (startRes.status === 400) {
+          throw { type: 'USER_ERROR' }; // Triggers Elf Modal below
       }
+
+      // CASE C: Server Crash (500)
+      if (!startRes.ok) throw { type: 'MELTDOWN' };
+
+      // 5. SUCCESS
+      const data = await startRes.json();
+      
+      // Smart Video Selector (Fixes "Image instead of Video" bug)
+      let finalUrl = "";
+      if (Array.isArray(data.output)) {
+          finalUrl = data.output.find((url: string) => url.endsWith('.mp4')) || data.output[0];
+      } else {
+          finalUrl = data.output;
+      }
+      
+      setResultVideoUrl(finalUrl);
+      
+      // Update Local Credits (Server already updated DB)
+      if (!hasChristmasPass) {
+          setCredits(prev => Math.max(0, prev - 1));
+          setFreeUsed(true);
+          localStorage.setItem('giggle_free_used', 'true');
+      }
+
     } catch (err: any) {
       console.error("Swap Error:", err);
-      setIsLoading(false);
+      
+      // ELF MODAL LOGIC
       let modal = {
-          title: "🍪 The elves are on a cookie break!",
-          message: "Please come back in 10 minutes!",
-          btnText: "Refresh Page",
-          btnColor: "bg-gray-500 text-white",
-          action: () => window.location.reload()
+          title: "Oh no! The magic fizzled.",
+          message: "Something went wrong. Please try again!",
+          btnText: "Try Again",
+          btnColor: "bg-gray-800 text-white",
+          action: () => setErrorModal(null)
       };
-      const type = err.type || 'MELTDOWN';
-      if (type === 'USER_ERROR') {
+
+      if (err.type === 'USER_ERROR') {
           modal = {
-              title: "🎅 No face found!",
-              message: "Please pick a clearer photo where they are looking at the camera!",
-              btnText: "Try Again",
+              title: "🧐 The elves are scratching their heads!",
+              message: "We couldn't find a face in that photo. Please pick a clearer photo where they are looking right at the camera! 📸",
+              btnText: "Pick a Different Photo",
               btnColor: "bg-teal-600 text-white",
               action: () => { setErrorModal(null); setSelectedFile(null); }
           };
       }
+
       setErrorModal(modal);
+    } finally {
+      setIsLoading(false);
     }
   };
 
