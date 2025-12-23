@@ -21,11 +21,12 @@ export async function POST(request: Request) {
     const { sourceImage, targetVideo, userId } = body; 
     const headerDeviceId = request.headers.get('x-device-id');
 
+    // 1. INPUT CHECK
     if (!sourceImage || !targetVideo) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
     }
 
-    // 1. HYBRID LOOKUP
+    // 2. HYBRID LOOKUP
     const lookupColumn = userId ? 'id' : 'device_id';
     const lookupValue = userId || headerDeviceId;
 
@@ -39,33 +40,10 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // 2. THE ELF GUARD (Pre-Check)
-    // We try to check for a face. If this fails/errors, we just log it and move on.
-    try {
-        const caption: any = await replicate.run(
-            "salesforce/blip:2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
-            {
-                input: {
-                    image: sourceImage,
-                    task: "visual_question_answering",
-                    question: "Is there a human face, person, or baby in this photo? Answer yes or no."
-                }
-            }
-        );
-
-        const answer = (caption || "").toString().toLowerCase();
-        console.log("🧝 ELF GUARD SAYS:", answer);
-
-        if (answer.includes("no")) {
-             return NextResponse.json({ error: "No face detected (Elf Guard)" }, { status: 400 });
-        }
-    } catch (guardError) {
-        console.warn("Elf Guard skipped:", guardError);
-    }
-
-    // 3. RUN MAGIC (Synchronous)
+    // 🔴 3. RUN MAGIC (Sync Mode - No Elf Guard)
     let output;
     try {
+        console.log("🚀 STARTING AI...");
         output = await replicate.run(
           "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
           {
@@ -75,15 +53,25 @@ export async function POST(request: Request) {
             }
           }
         );
+        console.log("✅ AI SUCCESS");
+
     } catch (aiError: any) {
-        console.error("AI Generation Failed:", aiError);
-        // 🔴 FIX: CATCH-ALL SAFETY NET
-        // Instead of crashing (500), we assume ANY AI failure is a bad photo (400).
-        // This ensures the user sees the Elf Modal ("Pick a different photo").
+        // 🔴 DETAILED ERROR LOGGING
+        console.error("❌ AI CRASHED:", aiError);
+        
+        // Check specifically for Replicate "Download Failed" (Bucket Permission / URL issues)
+        const errString = aiError.toString().toLowerCase();
+        if (errString.includes("download") || errString.includes("file")) {
+            console.error("⚠️ CHECK YOUR SUPABASE BUCKET PERMISSIONS!");
+        }
+
+        // CATCH-ALL: Prevent 500. Return 400 so UI shows Elf Modal.
+        // We DO NOT charge the user here.
         return NextResponse.json({ error: "AI Processing Failed" }, { status: 400 });
     }
 
     // 4. SUCCESS -> CHARGE CREDIT
+    // This code is ONLY reached if the AI did not crash.
     const updates: any = {
         swap_count: (user.swap_count || 0) + 1 
     };

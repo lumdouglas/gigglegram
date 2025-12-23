@@ -612,31 +612,40 @@ export default function Home() {
             <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
               {TEMPLATES.map((t, index) => {
                   // 1. DETERMINE ACCESS & LOCK STATE
+                  // Premium templates are locked if you only have the 1 free credit (need >1 or pass)
                   const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
                   const isLocked = t.isPremium && !isPremiumUser;
 
                   // 2. CALCULATE BADGE CONFIG (The "Nana Logic")
                   let badge = { text: "", color: "", position: "" };
 
-                  if (hasChristmasPass) {
-                      // CASE A: The Queen (VIP)
+                  // PRIORITY 1: LOCK STATE
+                  if (isLocked) {
+                       badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
+                  } 
+                  // PRIORITY 2: VIP PASS
+                  else if (hasChristmasPass) {
                       badge = { text: "✨ UNLIMITED", color: "bg-amber-400 text-black", position: "bottom" };
-                  } else if (credits > 0) {
-                      // CASE B: The Wallet Holder
-                      // 🔴 UX FIX: If it is the "Free Gift", say FREE!
-                      if (credits === 1 && !freeUsed && purchasedPacks === 0) {
+                  } 
+                  // PRIORITY 3: FREE GIFT (Only for Free Tier Templates)
+                  else if (credits === 1 && !freeUsed && purchasedPacks === 0) {
+                      // Only show "FREE" on the standard templates (index < 6)
+                      if (!t.isPremium) {
                           badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
                       } else {
-                          // Otherwise (Purchased Credits), show the cost
-                          badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
+                          // Should effectively be caught by "isLocked", but just in case:
+                          badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
                       }
-                  } else {
-                      // CASE C: Empty Wallet / Guest
-                      if (index < 6) {
-                           // Free Tier (Invitation)
+                  } 
+                  // PRIORITY 4: STANDARD WALLET
+                  else if (credits > 0) {
+                      badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
+                  }
+                  // PRIORITY 5: EMPTY WALLET (Guest)
+                  else {
+                      if (!t.isPremium) {
                            badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
                       } else {
-                           // Premium Tier (Gate)
                            badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
                       }
                   }
@@ -672,16 +681,6 @@ export default function Home() {
                                       <span>{badge.text}</span>
                                   </div>
                               </div>
-                          )}
-
-                          {/* VIP OVERRIDE: Show 'OPEN' if it was premium but is now unlocked */}
-                          {index >= 6 && !isLocked && !hasChristmasPass && credits === 0 && (
-                             <div className="absolute top-2 right-2 z-20">
-                              <div className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                                <span>✨</span>
-                                <span>OPEN</span>
-                              </div>
-                            </div>
                           )}
                       </button>
                   );
