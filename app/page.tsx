@@ -619,11 +619,17 @@ export default function Home() {
                   let badge = { text: "", color: "", position: "" };
 
                   if (hasChristmasPass) {
-                      // CASE A: The Queen
+                      // CASE A: The Queen (VIP)
                       badge = { text: "✨ UNLIMITED", color: "bg-amber-400 text-black", position: "bottom" };
                   } else if (credits > 0) {
-                      // CASE B: The Wallet Holder (Honest Pricing)
-                      badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
+                      // CASE B: The Wallet Holder
+                      // 🔴 UX FIX: If it is the "Free Gift", say FREE!
+                      if (credits === 1 && !freeUsed && purchasedPacks === 0) {
+                          badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
+                      } else {
+                          // Otherwise (Purchased Credits), show the cost
+                          badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
+                      }
                   } else {
                       // CASE C: Empty Wallet / Guest
                       if (index < 6) {
