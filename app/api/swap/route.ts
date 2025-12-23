@@ -18,10 +18,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json(); 
+    // 1. EXTRACT DATA (Secure UUID + Fallback)
     const { sourceImage, targetVideo, userId } = body; 
     const headerDeviceId = request.headers.get('x-device-id');
 
-    // 1. INPUT CHECK
     if (!sourceImage || !targetVideo) {
        return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
     }
@@ -36,15 +36,15 @@ export async function POST(request: Request) {
         .eq(lookupColumn, lookupValue)
         .maybeSingle();
 
+    // 3. CHECK PERMISSIONS (No Charge Yet)
     if (!user || (user.remaining_credits < 1 && !user.christmas_pass)) {
        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
-    // 🔴 3. RUN MAGIC (Synchronous)
+    // 4. RUN MAGIC (Synchronous - Wait for Result)
     let output;
     try {
-        console.log("🚀 STARTING AI WITH:", sourceImage); 
-        
+        console.log("🚀 STARTING AI SWAP...");
         output = await replicate.run(
           "xrunda/hello:104b4a39315349db50880757bc8c1c996c5309e3aa11286b0a3c84dab81fd440", 
           {
@@ -55,26 +55,13 @@ export async function POST(request: Request) {
           }
         );
         console.log("✅ AI SUCCESS");
-
     } catch (aiError: any) {
-        // 🔴 INTELLIGENT ERROR SORTING
-        const errString = (aiError.message || aiError.toString()).toLowerCase();
-        console.error("❌ AI CRASHED:", errString);
-
-        // CASE A: ACCESS ERROR (System Issue)
-        // If Replicate cannot download the file, it's a Bucket Permission issue.
-        if (errString.includes("download") || errString.includes("status code") || errString.includes("403") || errString.includes("404")) {
-            console.error("🚨 CRITICAL: Replicate cannot download the image. Check Supabase Bucket Public Settings!");
-            return NextResponse.json({ error: "System Error: Cannot access photo." }, { status: 500 });
-        }
-
-        // CASE B: FACE/PROCESSING ERROR (User Issue)
-        // If it's not a download error, it's likely the model failing on the pixels (No Face).
-        // We catch this and show the Elf Modal.
-        return NextResponse.json({ error: "No face detected in photo." }, { status: 400 });
+        console.error("❌ AI FAILED (Safe Exit - No Charge):", aiError);
+        // RETURN 500 FOR ANY ERROR (Triggers Generic Modal)
+        return NextResponse.json({ error: "AI Processing Failed" }, { status: 500 });
     }
 
-    // 4. SUCCESS -> CHARGE CREDIT
+    // 5. SUCCESS -> CHARGE CREDIT
     const updates: any = {
         swap_count: (user.swap_count || 0) + 1 
     };
@@ -94,7 +81,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, output });
 
   } catch (error: any) {
-    console.error('Swap Error:', error);
-    return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 });
+    console.error('General Error:', error);
+    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
   }
 }

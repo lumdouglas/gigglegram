@@ -31,7 +31,6 @@ export default function Home() {
   
   // MONETIZATION
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [hasChristmasPass, setHasChristmasPass] = useState(false); 
   const [credits, setCredits] = useState(0);
   const [purchasedPacks, setPurchasedPacks] = useState(0); 
@@ -64,11 +63,9 @@ export default function Home() {
   // UI
   const [errorModal, setErrorModal] = useState<any>(null);
 
-  // --- EFFECTS ---
-  // --- HELPER: USER SYNC LOGIC ---
+  // --- USER SYNC LOGIC ---
   const checkUser = async (sessionUser: any = null) => {
       try {
-        // 1. DEVICE ID SETUP
         let currentId = localStorage.getItem('giggle_device_id');
         if (!currentId) {
             currentId = uuidv4();
@@ -79,17 +76,13 @@ export default function Home() {
         const localFreeUsed = localStorage.getItem('giggle_free_used');
         if (localFreeUsed === 'true') setFreeUsed(true);
 
-        // 2. SET EMAIL STATE
         if (sessionUser?.email) {
             setUserEmail(sessionUser.email);
         } else {
             setUserEmail(null); 
         }
 
-        // 3. SMART QUERY (The "Merge" Logic)
         let user = null;
-
-        // PATH A: If we have an email, try to find the "Real" User first
         if (sessionUser?.email) {
             const { data: emailUser } = await supabase
                 .from('magic_users')
@@ -100,31 +93,25 @@ export default function Home() {
             if (emailUser) {
                 user = emailUser;
             } else {
-                // 🛑 MERGE DETECTED: User has email, but DB doesn't know it yet.
-                // Check if this device has a "Ghost" history we can claim.
                 const { data: ghostUser } = await supabase
                     .from('magic_users')
                     .select('*')
                     .eq('device_id', currentId)
-                    .is('email', null) // Only claim if it's truly a ghost
+                    .is('email', null) 
                     .maybeSingle();
 
                 if (ghostUser) {
-                    console.log("👻 Merging Ghost Account into Real Account...");
-                    // UPDATE the ghost row with the new email
-                    const { data: mergedUser, error: mergeError } = await supabase
+                    const { data: mergedUser } = await supabase
                         .from('magic_users')
                         .update({ email: sessionUser.email })
                         .eq('id', ghostUser.id)
                         .select()
                         .single();
-                    
                     if (mergedUser) user = mergedUser;
                 }
             }
         } 
         
-        // PATH B: If no email (or merge failed), just look by Device ID
         if (!user) {
              const { data: deviceUser } = await supabase
                 .from('magic_users')
@@ -134,52 +121,46 @@ export default function Home() {
              user = deviceUser;
         }
 
-        // [KEEP] Race Condition "Double Tap" Logic follows here...
-        // ---------------------------------------------------------
-
-        // 4. LOAD USER DATA
         if (user) {
             if (user.email) setUserEmail(user.email);
-            
             if (user.christmas_pass) {
                 setHasChristmasPass(true);
                 setFreeUsed(false); 
             } else {
                 if (user.remaining_credits > 0) setCredits(user.remaining_credits);
                 if (user.purchased_packs) setPurchasedPacks(user.purchased_packs);
-
                 if (user.free_swap_used) {
                     setFreeUsed(true);
                     localStorage.setItem('giggle_free_used', 'true');
                 }
             }
-            // Sync Device ID if we found a user
             if (sessionUser?.email && user.device_id) {
                 setDeviceId(user.device_id);
                 localStorage.setItem('giggle_device_id', user.device_id);
             }
         } else {
-            // New User Creation (Guest Mode)
             if (!sessionUser?.email) {
-                // 1. CREATE THE DB ROW
-                const { error: insertError } = await supabase
+                // Try Update First (Ghost Fix)
+                const { data: existingRow } = await supabase
+                   .from('magic_users')
+                   .update({ device_id: currentId })
+                   .eq('id', sessionUser.id)
+                   .select()
+                   .maybeSingle();
+
+                if (!existingRow) {
+                   const { error: insertError } = await supabase
                     .from('magic_users')
                     .insert([{ 
                         id: sessionUser.id,
                         device_id: currentId, 
                         remaining_credits: 1, 
                         swap_count: 0
-                        // CRITICAL: If your table expects 'id' to match Auth, you might need:
-                        // id: sessionUser.id 
                     }]);
-
-                if (insertError) {
-                    console.error("CRITICAL: DB Creation Failed", insertError);
-                    // If DB fails, do NOT give UI credits, or they will hit the 402 wall.
-                    setCredits(0); 
+                   if (!insertError) setCredits(1);
+                   else setCredits(0);
                 } else {
-                    // Only grant UI credits if DB write succeeded
-                    setCredits(1);
+                   setCredits(1);
                 }
             }
         }
@@ -189,62 +170,35 @@ export default function Home() {
           setIsInitializing(false);
       }
     };
-  // --- EFFECTS ---
-
-  // --- EFFECTS ---
 
   useEffect(() => {
     const initSession = async () => {
       try {
-        // 1. Check for existing session
         const { data: { session: existingSession } } = await supabase.auth.getSession();
-        
         let activeSession = existingSession;
-
-        // 2. If no session, CREATE ANONYMOUS USER (Invisible Login)
         if (!activeSession) {
-            console.log("👻 No session found. creating anonymous ghost...");
             const { data, error } = await supabase.auth.signInAnonymously();
-            
-            // IF THIS FAILS, WE MUST HANDLE IT
-            if (error) {
-                console.error("Ghost Login Failed:", error);
-                // Fallback: Just let the app load as "Guest" without auth if needed
-                // or throw to hit the catch block
-                throw error;
-            }
+            if (error) throw error;
             activeSession = data.session;
         }
-
         setSession(activeSession);
-        
-        // 3. SYNC USER DATA
         if (activeSession?.user) {
-            // This handles setIsInitializing(false) internally
             await checkUser(activeSession.user);
         } else {
-            // Safety: If we have no user, stop loading
             setIsInitializing(false);
         }
-
       } catch (err) {
         console.error("Auth Init Failed:", err);
-        // 🔴 CRITICAL FIX: Turn off loading so the user can at least see the UI
         setIsInitializing(false);
       }
     };
-
-    // RUN ON MOUNT
     initSession();
-
-    // LISTEN FOR CHANGES
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setSession(session);
         checkUser(session?.user);
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -262,23 +216,15 @@ export default function Home() {
   }, [isLoading]);
 
   // --- HANDLERS ---
-
   const handleLogout = async () => {
-    // 1. Sign out of Supabase Auth
     await supabase.auth.signOut();
-    
-    // 2. GENERATE NEW DEVICE ID (Disconnect from the old "Credit-Rich" ID)
     const newId = uuidv4();
     localStorage.setItem('giggle_device_id', newId);
     setDeviceId(newId);
-    
-    // 3. Clear State
     setUserEmail(null);
     setCredits(0);
     setPurchasedPacks(0);
     setHasChristmasPass(false);
-    
-    // 4. Reload to be clean
     window.location.reload();
   };
 
@@ -289,76 +235,46 @@ export default function Home() {
     }
   };
 
-  // NEW: Secure Buy Handler
   const handleSafeBuy = (buyUrl: string) => {
-    // 1. If we already know her email, let her pass
     if (userEmail) {
        const finalUrl = `${buyUrl}&checkout[email]=${encodeURIComponent(userEmail)}`;
        window.open(finalUrl, '_blank');
-    } 
-    // 2. If no email, Stop! Show the modal.
-    else {
+    } else {
        setPendingBuyUrl(buyUrl);
        setShowEmailModal(true);
     }
   };
 
-  // NEW: Save Email & Trigger Logic
   const saveEmailAndBuy = async () => {
-    // VALIDATION
     if (!emailInput.includes('@')) {
         alert("Please enter a valid email address.");
         return;
     }
-
-    // 1. SAVE "TEXT" EMAIL TO DATABASE
     if (deviceId) {
         const { error } = await supabase
             .from('magic_users')
             .update({ email: emailInput }) 
             .eq('device_id', deviceId);
-            
-        // NEW: HANDLE DUPLICATE EMAIL
-        if (error) {
-            // Error 23505 means "Email already exists"
-            if (error.code === '23505') {
-                 console.log("👋 Returning user detected (Email already in DB)");
-                 // We proceed! We don't save the email to *this* device row (to keep DB clean),
-                 // but we still let her pay and get credits on this device.
-            } else {
-                 console.error("Email save failed:", error);
-            }
-        }
     }
-
-    // 2. TRIGGER MAGIC LINK (Shadow Sign-up)
-    // We attempt to send the link. If it's a new device, this lets her merge later.
     const { error: authError } = await supabase.auth.signInWithOtp({
         email: emailInput,
-        options: {
-            emailRedirectTo: window.location.origin, 
-        }
+        options: { emailRedirectTo: window.location.origin }
     });
-
-    // 3. UPDATE STATE & GO
     setUserEmail(emailInput);
     setShowEmailModal(false);
-
-    // 4. CHECKOUT
     const finalUrl = `${pendingBuyUrl}&checkout[email]=${encodeURIComponent(emailInput)}`;
     window.open(finalUrl, '_blank');
   };
 
+  // --- MAIN SWAP LOGIC ---
   const handleSwap = async () => {
-    if (!selectedFile || !session?.user) return; // Ensure session exists
+    if (!selectedFile || !session?.user) return;
 
-    // 1. FRONTEND PERMISSION CHECK
     if (selectedTemplate.isPremium && !hasChristmasPass && credits <= 0) {
         setPaywallReason('premium');
         setShowPaywall(true); 
         return;
     }
-    // Allow if VIP, has credits, or using free gift
     const isAllowed = hasChristmasPass || credits > 0 || !freeUsed;
     if (!isAllowed) {
         setPaywallReason('free_limit');
@@ -367,35 +283,29 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    // Start the Santa Script
     setLoadingMessage("Connecting to the North Pole... 📡");
     setErrorModal(null); 
 
     try {
-      // 2. UPLOAD IMAGE
       const filename = `${session.user.id}-${Date.now()}.jpg`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('uploads') // CHECK: Is your bucket 'uploads' or 'user-uploads'?
+        .from('uploads')
         .upload(filename, selectedFile, { upsert: true });
 
       if (uploadError) throw new Error("Upload failed: " + uploadError.message);
 
       const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filename}`;
 
-      // 3. CALL API (SYNC MODE)
       const startRes = await fetch('/api/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId || 'unknown' },
-        body: JSON.stringify({ 
-            userId: session.user.id, // 🔴 CRITICAL: Sends UUID to fix 402 Error
-            sourceImage: publicUrl,
-            targetVideo: selectedTemplate.url 
+        body: JSON.stringify({
+          userId: session.user.id,
+          sourceImage: publicUrl,
+          targetVideo: selectedTemplate.url 
         }),
       });
 
-      // 4. HANDLE RESPONSES
-      
-      // CASE A: Paywall (402)
       if (startRes.status === 402) {
           setIsLoading(false);
           setCredits(0);
@@ -406,18 +316,11 @@ export default function Home() {
           return;
       }
 
-      // CASE B: Sad Path (400 - No Face)
-      if (startRes.status === 400) {
-          throw { type: 'USER_ERROR' }; // Triggers Elf Modal below
-      }
+      if (!startRes.ok) throw new Error("Processing failed");
 
-      // CASE C: Server Crash (500)
-      if (!startRes.ok) throw { type: 'MELTDOWN' };
-
-      // 5. SUCCESS
       const data = await startRes.json();
       
-      // Smart Video Selector (Fixes "Image instead of Video" bug)
+      // Smart Video Selector
       let finalUrl = "";
       if (Array.isArray(data.output)) {
           finalUrl = data.output.find((url: string) => url.endsWith('.mp4')) || data.output[0];
@@ -427,7 +330,6 @@ export default function Home() {
       
       setResultVideoUrl(finalUrl);
       
-      // Update Local Credits (Server already updated DB)
       if (!hasChristmasPass) {
           setCredits(prev => Math.max(0, prev - 1));
           setFreeUsed(true);
@@ -435,85 +337,48 @@ export default function Home() {
       }
 
     } catch (err: any) {
-      console.error("Swap Error:", err);
-      
-      // ELF MODAL LOGIC
-      let modal = {
-          title: "Oh no! The magic fizzled.",
-          message: "Something went wrong. Please try again!",
+      console.error("Swap failed:", err);
+      // GENERIC SNOWFLAKE ERROR MODAL
+      setErrorModal({
+          title: "❄️ Oh no! The magic fizzled.",
+          message: "The elves hit a snag while making your video. Please try again!",
           btnText: "Try Again",
-          btnColor: "bg-gray-800 text-white",
+          btnColor: "bg-teal-600 text-white",
           action: () => setErrorModal(null)
-      };
-
-      if (err.type === 'USER_ERROR') {
-          modal = {
-              title: "🧐 The elves are scratching their heads!",
-              message: "We couldn't find a face in that photo. Please pick a clearer photo where they are looking right at the camera! 📸",
-              btnText: "Pick a Different Photo",
-              btnColor: "bg-teal-600 text-white",
-              action: () => { setErrorModal(null); setSelectedFile(null); }
-          };
-      }
-
-      setErrorModal(modal);
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ... inside Home() ...
-
+  // --- SHARE HELPERS ---
   const handleSmartShare = async () => {
     if (!resultVideoUrl) return;
     setIsSharing(true);
-
     try {
-        // 1. LOGGING
         if (deviceId) {
-            const { data } = await supabase
-                .from('magic_users')
-                .select('shares_count')
-                .eq('device_id', deviceId)
-                .maybeSingle();
-                
-            if (data) {
-                 await supabase
-                    .from('magic_users')
-                    .update({ shares_count: (data.shares_count || 0) + 1 })
-                    .eq('device_id', deviceId);
-            }
+            const { data } = await supabase.from('magic_users').select('shares_count').eq('device_id', deviceId).maybeSingle();
+            if (data) await supabase.from('magic_users').update({ shares_count: (data.shares_count || 0) + 1 }).eq('device_id', deviceId);
         }
-
-        // 2. THE BLOB MANEUVER
         const response = await fetch(resultVideoUrl);
         const blob = await response.blob();
-        
-        // REVISION: Universal Filename 
         const fileName = "GiggleGram_Magic.mp4"; 
-        
         const file = new File([blob], fileName, { type: "video/mp4" });
-
-        // 3. SHARE THE FILE
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
                 files: [file],
                 title: "My GiggleGram Magic! ✨",
-                // EXACT COPY FROM V5 SPEC:
                 text: "I made a little magic with my favorite little star! ✨🌟\n\n👇 Try it here:\nhttps://MyGiggleGram.com"
             });
-        }
-        // 4. DESKTOP FALLBACK
-        else {
+        } else {
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = fileName; // Uses the new universal name
+            a.download = fileName; 
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            alert("✨ Magic saved to your Downloads folder!\n\nNow you can email it or upload it to Facebook.");
+            alert("✨ Magic saved to your Downloads folder!");
         }
-
     } catch (err) {
         console.error("Share failed:", err);
         try {
@@ -522,12 +387,12 @@ export default function Home() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = "GiggleGram_Magic.mp4"; // Universal Fallback
+            a.download = "GiggleGram_Magic.mp4";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         } catch (e) {
-            alert("Could not share. Please try the 'Save to Photos' button below!");
+            alert("Could not share. Please try the 'Save to Photos' button!");
         }
     } finally {
         setIsSharing(false);
@@ -548,23 +413,18 @@ export default function Home() {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
-
         setSaveStatus('saved'); 
         setTimeout(() => setSaveStatus('idle'), 3000);
       } catch (err) {
-        console.error("Download error:", err);
         setSaveStatus('idle'); 
         alert("Saving failed. You can right-click the video to save it!");
       }
   };
 
-  // --- RENDER ---
-
-  // REPLACE THE ENTIRE 'return' STATEMENT WITH THIS:
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-pink-50 to-white relative pb-20">
       
-      {/* HEADER WITH LOGOUT */}
+      {/* HEADER */}
       <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
         {userEmail ? (
             <div className="flex flex-col items-end gap-1">
@@ -579,14 +439,12 @@ export default function Home() {
       <div className="max-w-md mx-auto pt-8">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-center mb-2 text-teal-900 tracking-tight">Make Christmas Magic! 🎄✨</h1>
         
-        {/* GOLDEN BADGE (Revenue Goal) */}
         {hasChristmasPass && (
           <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full font-bold text-center mb-6 border-2 border-yellow-300 animate-bounce w-fit mx-auto">
             ✨ Christmas VIP Pass Active
           </div>
         )}
 
-        {/* CREDIT DISPLAY LOGIC */}
         {!hasChristmasPass && (
             <div className="w-full text-center py-4 mb-2 min-h-[60px] flex items-center justify-center">
                 {isInitializing ? (
@@ -607,41 +465,30 @@ export default function Home() {
             </div>
         )}
 
-        {/* TEMPLATE GRID (The Product) */}
+        {/* TEMPLATE GRID */}
           <div className="bg-white rounded-3xl shadow-xl p-6 border border-pink-100">
             <div className="mb-6 flex overflow-x-auto gap-3 pb-4 snap-x px-1 scrollbar-hide">
               {TEMPLATES.map((t, index) => {
-                  // 1. DETERMINE ACCESS & LOCK STATE
-                  // Premium templates are locked if you only have the 1 free credit (need >1 or pass)
                   const isPremiumUser = hasChristmasPass || purchasedPacks > 0 || credits > 1;
                   const isLocked = t.isPremium && !isPremiumUser;
 
-                  // 2. CALCULATE BADGE CONFIG (The "Nana Logic")
                   let badge = { text: "", color: "", position: "" };
-
-                  // PRIORITY 1: LOCK STATE
                   if (isLocked) {
                        badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
                   } 
-                  // PRIORITY 2: VIP PASS
                   else if (hasChristmasPass) {
                       badge = { text: "✨ UNLIMITED", color: "bg-amber-400 text-black", position: "bottom" };
                   } 
-                  // PRIORITY 3: FREE GIFT (Only for Free Tier Templates)
                   else if (credits === 1 && !freeUsed && purchasedPacks === 0) {
-                      // Only show "FREE" on the standard templates (index < 6)
                       if (!t.isPremium) {
                           badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
                       } else {
-                          // Should effectively be caught by "isLocked", but just in case:
                           badge = { text: "🔒 LOCKED", color: "bg-black/60 text-white backdrop-blur-md", position: "top" };
                       }
                   } 
-                  // PRIORITY 4: STANDARD WALLET
                   else if (credits > 0) {
                       badge = { text: "🍪 1 CREDIT", color: "bg-gray-100 text-gray-800 border-gray-200", position: "bottom" };
                   }
-                  // PRIORITY 5: EMPTY WALLET (Guest)
                   else {
                       if (!t.isPremium) {
                            badge = { text: "🎁 FREE", color: "bg-teal-500 text-white animate-pulse", position: "bottom" };
@@ -671,8 +518,6 @@ export default function Home() {
                               alt={t.name} 
                               className={`w-full h-full object-cover ${isLocked ? 'grayscale opacity-80' : ''}`} 
                           />
-                          
-                          {/* DYNAMIC BADGE RENDERER */}
                           {badge.text && (
                               <div className={`absolute z-20 w-max ${
                                   badge.position === 'top' ? 'top-2 right-2' : 'bottom-2 left-1/2 -translate-x-1/2'
@@ -687,7 +532,7 @@ export default function Home() {
               })}
             </div>
 
-          {/* PHOTO UPLOAD (The Input) */}
+          {/* PHOTO UPLOAD */}
           <div className="mb-8">
              <label className="block w-full cursor-pointer relative group active:scale-95 transition-transform">
                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
@@ -713,7 +558,6 @@ export default function Home() {
 
           <div className="flex items-center justify-start gap-1 mb-6 text-xs text-gray-400 pl-2"><span>🔒</span><span>Powered by AI Magic. Photo deleted immediately.</span></div>
 
-          {/* MAIN ACTION BUTTON (Compliance: Gray/Teal State Logic) */}
           <button 
             onClick={handleSwap} 
             disabled={!selectedFile || isLoading || isInitializing} 
@@ -734,7 +578,7 @@ export default function Home() {
                         : 'Make the Magic! ✨'}
           </button>
 
-          {/* ERROR MODAL (Sad Path) */}
+          {/* ERROR MODAL */}
           {errorModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
                 <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
@@ -745,7 +589,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* RESULT VIDEO & SHARE (The Viral Loop) */}
+          {/* RESULT VIDEO */}
           {resultVideoUrl && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100">
               <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl aspect-square bg-black group">
@@ -803,15 +647,13 @@ export default function Home() {
         </div>
       </div>
 
-      {/* PAYWALL MODAL (Compliance: Grey Anchor / Pulse Target) */}
+      {/* PAYWALL MODAL */}
       {showPaywall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative p-6">
              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-2 bg-gray-200 rounded-full">✕</button>
              <div className="text-center mb-6"><div className="text-5xl mb-2">🎄</div><h3 className="text-xl font-bold text-black text-center mb-2">Woah! You loved that one?</h3><p className="text-gray-500">Choose a pass to keep going!</p></div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* CARD 1: THE ANCHOR (Boring Grey) */}
                 <button 
                     onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/adf30529-5df7-4758-8d10-6194e30b54c7?checkout[custom][device_id]=${deviceId}`)} 
                     className="border-2 border-gray-200 rounded-2xl p-4 active:scale-95 transition-all bg-white text-center block w-full"
@@ -822,8 +664,6 @@ export default function Home() {
                         Get 10 Videos
                     </div>
                 </button>
-                
-                {/* CARD 2: THE TARGET (Pulsing Teal) */}
                 <button 
                     onClick={() => handleSafeBuy(`https://mygigglegram.lemonsqueezy.com/buy/675e173b-4d24-4ef7-94ac-2e16979f6615?checkout[custom][device_id]=${deviceId}`)} 
                     className="border-4 border-yellow-400 rounded-2xl p-4 active:scale-95 transition-all relative text-center block w-full shadow-lg transform scale-105"
@@ -835,14 +675,13 @@ export default function Home() {
                         Get Unlimited Magic
                     </div>
                 </button>
-
              </div>
              <div className="mt-6 text-center text-xs text-gray-400"><a href="/login" className="underline text-teal-600">Restore Purchase</a><br/>One-time payment. No subscription.</div>
           </div>
         </div>
       )}
 
-      {/* EMAIL CAPTURE MODAL (The Bridge) */}
+      {/* EMAIL CAPTURE MODAL */}
       {showEmailModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-300">
@@ -852,7 +691,6 @@ export default function Home() {
               <p className="text-slate-600 mb-6 leading-snug">
                 Please enter your email so we can restore your credits if you ever lose your phone.
               </p>
-              
               <input 
                 type="email" 
                 placeholder="nana@example.com"
@@ -860,14 +698,12 @@ export default function Home() {
                 onChange={(e) => setEmailInput(e.target.value)}
                 className="w-full text-lg p-4 bg-slate-50 border-2 border-slate-200 rounded-xl mb-4 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20 outline-none transition-all"
               />
-
               <button 
                 onClick={saveEmailAndBuy}
                 className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
               >
                 Secure & Continue to Pay ➔
               </button>
-              
               <button 
                 onClick={() => setShowEmailModal(false)}
                 className="mt-4 text-slate-400 font-medium text-sm hover:text-slate-600"
