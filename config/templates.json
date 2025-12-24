@@ -1,13 +1,5 @@
 [
   { 
-    "id": "baby_ceo", 
-    "name": "Baby CEO 💼", 
-    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4",
-    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg",
-    "badge": "POPULAR",
-    "isPremium": false
-  },
-  { 
     "id": "cookie_thief", 
     "name": "Cookie Thief 🍪", 
     "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/2_cookie_thief.mp4", 
@@ -21,6 +13,14 @@
     "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.mp4", 
     "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/3_snowball_sniper.jpg",
     "badge": "WINTER",
+    "isPremium": false
+  },
+  { 
+    "id": "baby_ceo", 
+    "name": "Baby CEO 💼", 
+    "url": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.mp4",
+    "thumb": "https://rmbpncyftoyhueanjjaq.supabase.co/storage/v1/object/public/template-videos/1_baby_ceo.jpg",
+    "badge": "POPULAR",
     "isPremium": false
   },
   { 
