@@ -22,26 +22,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Convert user photo to base64 data URI (never written to disk)
+    // Convert user photo to Blob (Replicate SDK v1 requires Blob/File, not data URIs)
     const userPhotoBuffer = Buffer.from(await userPhoto.arrayBuffer());
     const mimeType = userPhoto.type || 'image/jpeg';
-    const targetImageUri = `data:${mimeType};base64,${userPhotoBuffer.toString('base64')}`;
+    const targetBlob = new Blob([userPhotoBuffer], { type: mimeType });
 
-    // Load template from public/templates/
+    // Load template from public/templates/ as Blob
     const paddedIndex = templateIndex.padStart(2, '0');
     const templatePath = path.join(process.cwd(), 'public', 'templates', `template-${paddedIndex}.jpg`);
     const templateBuffer = readFileSync(templatePath);
-    const swapImageUri = `data:image/jpeg;base64,${templateBuffer.toString('base64')}`;
+    const swapBlob = new Blob([templateBuffer], { type: 'image/jpeg' });
 
-    // lucataco/faceswap: target_image is the base (face gets replaced),
-    // swap_image is the face source to paste in.
-    // Pin a specific version by appending :VERSION_HASH to the model string.
-    const output = await replicate.run('lucataco/faceswap', {
-      input: {
-        target_image: targetImageUri,
-        swap_image: swapImageUri,
-      },
-    });
+    // cdingram/face-swap: swaps the face from source_image onto target_image.
+    const output = await replicate.run(
+      'cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111',
+      {
+        input: {
+          input_image: targetBlob,
+          swap_image: swapBlob,
+        },
+      }
+    );
 
     // Output is a URL string (or array of URLs for some model versions)
     const outputUrl = Array.isArray(output) ? output[0] : output;
@@ -52,8 +53,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ output: String(outputUrl) });
   } catch (error: unknown) {
-    console.error('Faceswap error:', error);
-    const message = error instanceof Error ? error.message : 'Something went wrong';
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Faceswap error:', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

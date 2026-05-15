@@ -18,6 +18,7 @@ export default function FaceSwapPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [swapState, setSwapState] = useState<SwapState>('idle');
   const [result, setResult] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('Something went wrong — try a different photo');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((file: File) => {
@@ -51,7 +52,8 @@ export default function FaceSwapPage() {
       if (!res.ok || data.error) throw new Error(data.error || 'Unknown error');
       setResult(data.output);
       setSwapState('done');
-    } catch {
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Something went wrong — try a different photo');
       setSwapState('error');
     }
   };
@@ -184,7 +186,7 @@ export default function FaceSwapPage() {
             <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            Something went wrong — try a different photo
+            {errorMessage}
           </div>
         )}
 
